@@ -1,0 +1,2707 @@
+---
+title: "Maryland_Supplemental_Figures"
+output: html_document
+date: "2025-12-31"
+---
+
+#Set working directory
+```{r setup, include=TRUE}
+knitr::opts_knit$set(root.dir = "[input pathway to directory with data]")
+
+#Directory for saving figures
+f<-"[input pathway to where figure will be saved]"
+```
+
+#Activate packages
+```{r}
+library("phyloseq")
+library("ggplot2")
+library("patchwork")
+library("ggpubr")
+library("ALDEx2")
+library("phyloseq")
+library("dplyr")
+library("tidyverse")
+library ("BiocManager")
+library("devtools")
+library("httr")
+library("jsonlite") 
+library("reticulate")
+library("qiime2R")
+library("vegan")
+library("decontam")
+```
+
+#Supplemental Figure 1:ITS Figures Part 1
+
+```{r}
+water_rare_genus_ITS<-subset_samples(ps_rare_genus_ITS, treatgroup_2 == "Soap and water")
+chg_rare_genus_ITS<-subset_samples(ps_rare_genus_ITS, treatgroup_2 == "Chlorhexidine")
+water_rare_genus_ITS
+chg_rare_genus_ITS
+```
+
+#Figure 1A:Bray-Curtis Change Overtime
+
+#CHG
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-chg_rare_genus_ITS
+
+sample_data(ps_bds)$visit_2 <- fct_recode(sample_data(ps_bds)$vcode_prevfootcomp, 
+                                        "Pre-trt" = "1", 
+                                        "3 Months" = "3", 
+                                        "12 Months" = "6",
+                                        "Post-trt" = "7")
+#set testing parameter
+x="visit_2"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ visit_2, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_visit_chg_ITS<-ps_bds
+```
+
+
+#Graph
+```{r}
+y<-"Bray_Curtis_visit_chg_ITS"
+
+# Run NMDS 
+ordination_result <- ordinate(bray_visit_chg_ITS, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_visit_chg_plot_ITS<-plot_ordination(bray_visit_chg_ITS, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic(base_size = 20)+
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+  scale_color_manual(values = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF")) +
+  labs( title = "", color = "" )
+
+bray_visit_chg_plot_ITS
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_visit_chg_plot_ITS
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_visit_chg_plot_ITS
+dev.off()
+```
+
+
+#Water
+
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-water_rare_genus_ITS
+
+#reformat label
+sample_data(ps_bds)$visit_2 <- fct_recode(sample_data(ps_bds)$vcode_prevfootcomp, 
+                                        "Pre-trt" = "1", 
+                                        "3 Months" = "3", 
+                                        "12 Months" = "6",
+                                        "Post-trt" = "7")
+
+#set testing parameter
+x="visit_2"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ visit_2, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_visit_water_ITS<-ps_bds
+```
+
+#Graph
+```{r}
+y<-"Bray_Curtis_visit_water_ITS"
+
+
+# Run NMDS 
+ordination_result <- ordinate(bray_visit_water_ITS, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_visit_water_plot_ITS<-plot_ordination(bray_visit_water_ITS, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+  scale_color_manual(values = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF")) +
+  labs( title = "", color = "" )
+
+bray_visit_water_plot_ITS
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_visit_water_plot_ITS
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_visit_water_plot_ITS
+dev.off()
+```
+
+#Combine Graphs
+```{r}
+x<-"combined_BC_visit_ITS"
+
+# p1 has legend removed
+p1 <- bray_visit_chg_plot_ITS + 
+  theme(legend.position = "none") + 
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- bray_visit_water_plot_ITS + 
+   theme(legend.position = "bottom",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  labs(title = "Soap and water treatment") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_BC_visit_ITS <- p1 / p2 
+
+combined_BC_visit_ITS
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_BC_visit
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_BC_visit
+dev.off()
+```
+
+
+
+
+#Supplemental Figure 1B:Bray curtis plots
+
+#Chg
+```{r}
+##Prepare data
+
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(chg_rare_genus_ITS, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds <- rel_abundance 
+
+#calculate bray-distance
+bray_dist <- distance(ps_bds, method="bray") %>%
+  as.matrix() %>%
+  as.data.frame()
+
+#Structure table into rows (FIXED: create bray_long)
+bray_long <- rownames_to_column(bray_dist, "Sample_1") %>%
+  pivot_longer(
+    -Sample_1,
+    names_to = "Sample_2",
+    values_to = "Bray_Curtis",
+    values_transform = list(Bray_Curtis = as.numeric)
+  )
+
+#format metadata
+meta <- as(sample_data(ps_bds), "data.frame") %>%
+  rownames_to_column("Sample_ID")
+
+#FIXED: use bray_long
+merged_df <- bray_long %>%
+  left_join(meta, by = c("Sample_1" = "Sample_ID"))
+
+#Identify visit 1 sample IDs
+v1_list <- merged_df %>%
+  filter(vcode_prevfootcomp == "1") %>%
+  pull(Sample_1) %>%
+  unique()
+
+#Isolate visit 1 comparisons
+vist_1 <- merged_df %>%
+  filter(Sample_2 %in% v1_list)
+
+#Remove duplicate sample pairs
+vist_1 <- vist_1 %>%
+  mutate(
+    pair_min = pmin(Sample_1, Sample_2),
+    pair_max = pmax(Sample_1, Sample_2)
+  ) %>%
+  distinct(pair_min, pair_max, .keep_all = TRUE)
+
+#Remove same-sample comparisons
+vist_1 <- vist_1 %>%
+  filter(Sample_1 != Sample_2)
+
+#Save output
+chg_v1_BC <- vist_1
+chg_v1_BC
+```
+
+#Plot figure
+```{r}
+ps <- chg_v1_BC
+
+#Order factors correctly
+ps$visit_2 <- factor(ps$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+stats<-compare_means( Bray_Curtis ~ visit_2,
+              data =  chg_v1_BC,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y<-"CHG_BC_Boxplots_ITS"
+
+BC_Boxplot_chg_ITS<-ggplot(ps, aes(x=visit_2,y=Bray_Curtis, fill= visit_2)) +
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+  scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=26)",  
+  "3 Months" = "3 Months\n(n=25)",
+  "12 Months" = "12 Months\n(n=17)",
+  "Post-treatment" = "Post-trt\n(n=28)"))+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none", 
+       strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     size = 10,
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Chlorhexidine treatment", y = "Bray-Curtis Dissimilarity")
+
+BC_Boxplot_chg_ITS
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y,".pdf"), width = 6.67, height = 8.1) # Adjust dimensions as needed
+BC_Boxplot_chg_ITS
+dev.off()
+
+#Save as image
+png(filename = paste0(y,".png"), width = 2000, height = 2500, res = 300)
+BC_Boxplot_chg_ITS
+dev.off()
+```
+
+#Average distance
+```{r}
+interest_group<-chg_v1_BC
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_dev = mean(Bray_Curtis, na.rm = TRUE),
+    sd_dev = sd(Bray_Curtis, na.rm = TRUE),
+    se = sd_dev / sqrt(n),
+    ci95_low  = mean_dev - qt(0.975, df = n-1) * se,
+    ci95_high = mean_dev + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+#Water
+```{r}
+#Prepare data
+
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(water_rare_genus_ITS, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds <- rel_abundance 
+
+#calculate bray-distance
+bray_dist <- distance(ps_bds, method="bray") %>%
+  as.matrix() %>%
+  as.data.frame()
+
+#Structure table into rows (FIXED: create bray_long)
+bray_long <- rownames_to_column(bray_dist, "Sample_1") %>%
+  pivot_longer(
+    -Sample_1,
+    names_to = "Sample_2",
+    values_to = "Bray_Curtis",
+    values_transform = list(Bray_Curtis = as.numeric)
+  )
+
+#format metadata
+meta <- as(sample_data(ps_bds), "data.frame") %>%
+  rownames_to_column("Sample_ID")
+
+#FIXED: use bray_long
+merged_df <- bray_long %>%
+  left_join(meta, by = c("Sample_1" = "Sample_ID"))
+
+#Identify visit 1 sample IDs
+v1_list <- merged_df %>%
+  filter(vcode_prevfootcomp == "1") %>%
+  pull(Sample_1) %>%
+  unique()
+
+#Isolate visit 1 comparisons
+vist_1 <- merged_df %>%
+  filter(Sample_2 %in% v1_list)
+
+#Remove duplicate sample pairs
+vist_1 <- vist_1 %>%
+  mutate(
+    pair_min = pmin(Sample_1, Sample_2),
+    pair_max = pmax(Sample_1, Sample_2)
+  ) %>%
+  distinct(pair_min, pair_max, .keep_all = TRUE)
+
+#Remove same-sample comparisons
+vist_1 <- vist_1 %>%
+  filter(Sample_1 != Sample_2)
+
+#Save output
+water_v1_BC <- vist_1
+water_v1_BC
+```
+
+#Plot figure
+```{r}
+ps <- water_v1_BC
+
+
+#Order factors correctly
+ps$visit_2 <- factor(ps$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+stats<-compare_means( Bray_Curtis ~ visit_2,
+              data =  water_v1_BC,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y<-"water_BC_Boxplots_ITS"
+
+BC_Boxplot_water_ITS<-ggplot(ps, aes(x=visit_2,y=Bray_Curtis, fill= visit_2)) +
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+   scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=26)",  
+  "3 Months" = "3 Months\n(n=20)",
+  "12 Months" = "12 Months\n(n=14)",
+  "Post-treatment" = "Post-trt\n(n=17)"))+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none", 
+       strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     size = 10,
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Soap and water treatment", y = "Bray-Curtis Dissimilarity")
+
+BC_Boxplot_water_ITS
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y,".pdf"), width = 6.67, height = 8.1) # Adjust dimensions as needed
+BC_Boxplot_water_ITS
+dev.off()
+
+#Save as image
+png(filename = paste0(y,".png"), width = 2000, height = 2500, res = 300)
+BC_Boxplot_water_ITS
+dev.off()
+```
+
+#Average distance
+```{r}
+interest_group<-water_v1_BC
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_dev = mean(Bray_Curtis, na.rm = TRUE),
+    sd_dev = sd(Bray_Curtis, na.rm = TRUE),
+    se = sd_dev / sqrt(n),
+    ci95_low  = mean_dev - qt(0.975, df = n-1) * se,
+    ci95_high = mean_dev + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+#Combine Graphs
+```{r}
+x<-"combined_betadiversity_boxplots_ITS"
+
+# p1 has legend removed
+p1 <- BC_Boxplot_chg_ITS + 
+  theme(legend.position = "none") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- BC_Boxplot_water_ITS + 
+   theme(legend.position = "none",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_betadiversity_boxplots_ITS <- p1 / p2 
+
+combined_betadiversity_boxplots_ITS
+
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.7) 
+combined_betadiversity_boxplots_ITS
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5700, res = 300)
+combined_betadiversity_boxplots_ITS
+dev.off()
+
+```
+
+#SupplementalFigure 1C:Change during treatment ITS
+
+#CHG
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-chg_rare_genus_ITS
+
+#set testing parameter
+x="treatment_active"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ treatment_active, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_active_treat_chg_ITS<-ps_bds
+```
+
+
+#Graph
+```{r}
+y<-"Bray_Curtis_no_active_treatment_chg_ITS"
+
+# Run NMDS 
+ordination_result <- ordinate(bray_active_treat_chg_ITS, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_active_treat_chg_plot_ITS<-plot_ordination(bray_active_treat_chg_ITS, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#F54E4E","#8953CF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic(base_size = 20)+
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+  scale_color_manual(
+  values = c(
+    "Active treatment (3 months + 12 months)" = "#F54E4E",
+    "No active treatment (pre-trt + post-trt)" = "#8953CF"
+  ),
+  labels = c(
+    "Active treatment (3 months + 12 months)" = "Active trt (3 & 12 months)",
+    "No active treatment (pre-trt + post-trt)" = "No active trt (pre & post-trt)"
+  )
+)+
+  labs( title = "", color = "" )
+
+bray_active_treat_chg_plot_ITS
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_active_treat_chg_plot_ITS
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_active_treat_chg_plot_ITS
+dev.off()
+```
+
+
+#Water
+
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-water_rare_genus_ITS
+
+#set testing parameter
+x="treatment_active"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ treatment_active, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_active_treat_water_ITS<-ps_bds
+```
+
+#Graph
+```{r}
+y<-"Bray_Curtis_no_active_treatment_water_ITS"
+
+# Run NMDS 
+ordination_result <- ordinate(bray_active_treat_water_ITS, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_active_treat_water_plot_ITS<-plot_ordination(bray_active_treat_water_ITS, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#F54E4E","#8953CF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+   scale_color_manual(
+  values = c(
+    "Active treatment (3 months + 12 months)" = "#F54E4E",
+    "No active treatment (pre-trt + post-trt)" = "#8953CF"
+  ),
+  labels = c(
+    "Active treatment (3 months + 12 months)" = "Active trt (3 & 12 months)",
+    "No active treatment (pre-trt + post-trt)" = "No active trt (pre & post-trt)"
+  )
+)+
+  labs( title = "", color = "" )
+
+bray_active_treat_water_plot_ITS
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_active_treat_water_plot_ITS
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_active_treat_water_plot_ITS
+dev.off()
+```
+
+
+#Combine Graphs
+```{r}
+x<-"combined_active_treatment"
+
+# p1 has legend removed
+p1 <- bray_active_treat_chg_plot_ITS + 
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+p1 
+# p2 keeps legend
+p2 <- bray_active_treat_water_plot_ITS + 
+  labs(title = "Soap and water treatment") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_active_treatment_ITS <- (p1 / p2) +
+   plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+combined_active_treatment_ITS
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_active_treatment_ITS
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_active_treatment_ITS
+dev.off()
+
+```
+
+
+#Merge supplemental figure 1 plots
+```{r}
+x <-"Supplemental_figure_1_merged"
+
+combined_BC_visit_ITS_2  <- combined_BC_visit_ITS + theme(plot.margin = margin(b = 0,
+                                                                              t = 50,
+                                                                              r = 30,
+                                                                              l =50))
+
+
+combined_betadiversity_boxplots_2 <- combined_betadiversity_boxplots_ITS + theme(plot.margin = margin(b = 0,
+                                                                              t = 50,
+                                                                              r = 30,
+                                                                              l =50))
+
+
+
+
+combined_active_treatment_2 <- combined_active_treatment_ITS + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 50,
+                                            r = 50)) 
+
+
+
+
+
+
+figure_1_ITS <- (combined_BC_visit_ITS_2 |
+  combined_betadiversity_boxplots_2 | 
+  combined_active_treatment_2 ) + 
+  plot_layout(widths = c(1,1,1.25))
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+figure_1_ITS
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+figure_1_ITS
+dev.off()
+```
+
+
+
+#Supplemental Figure 2:ITS Figures Part 2
+
+#Supplemental Figure 2A: ITS Relative abundance 
+
+#Prepare data
+```{r}
+#Convert data structure 
+rel_abundance_ITS<-transform_sample_counts(ps_nr_genus_ITS, function(x) x*100/sum(x))
+df<-psmelt(rel_abundance_ITS)
+
+#Isolate treatment groups
+water_df<-subset(df, treatgroup == "0")
+chg_df<-subset(df, treatgroup == "1")
+
+#Isolate top abundant genera 
+top_genera_w <- water_df %>%
+  group_by(Genus) %>%
+  summarize(TotalAbundance = sum(Abundance, na.rm = TRUE)) %>%
+  arrange(desc(TotalAbundance)) %>%
+  slice_head(n = 15)  # Select the top 15 genera
+
+top_genus_names_w<-top_genera_w$Genus
+
+water_df$Genus<-ifelse(water_df$Genus %in% top_genus_names_w, water_df$Genus, "Other")
+
+
+top_genera_c <- chg_df %>%
+  group_by(Genus) %>%
+  summarize(TotalAbundance = sum(Abundance, na.rm = TRUE)) %>%
+  arrange(desc(TotalAbundance)) %>%
+  slice_head(n = 15)  # Select the top 15 genera
+
+top_genus_names_c<-top_genera_c$Genus
+chg_df$Genus<-ifelse(chg_df$Genus %in% top_genus_names_c, chg_df$Genus, "Other")
+
+#Check
+chg_df
+water_df
+
+top_genera_c
+top_genus_names_c
+```
+
+
+#Bubble Plot
+```{r}
+y<-"ITS_Rel_chg"
+
+ps <-chg_df
+order<-c("Other",top_genus_names_c)
+ps$Genus<-factor(ps$Genus, levels = order)
+
+
+ITS_Rel_chg<-ggplot(ps, aes(x=Patient_id, y=Genus, size = Abundance)) +
+  geom_point(alpha=0.7)+
+  facet_grid(~visit_2, scales = "free_x", space = "free_x", labeller = labeller(
+  visit_2 = c(
+    "Pre-treatment"  = "Pre-trt\n(n=26)",
+    "3 Months"       = "3 Months\n(n=25)",
+    "12 Months"      = "12 Months\n(n=17)",
+    "Post-treatment" = "Post-trt\n(n=28)"
+)))+
+ theme(strip.text = element_text(size=20),
+       panel.background = element_rect(fill="#fafafa"),
+   strip.background = element_blank(), 
+        axis.text.y = element_text(size=20,face ="italic"),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1,face = "bold"),
+        axis.text.x.bottom =  element_blank(),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26))+
+  labs(color = "visit", size = "Relative Abundance %", x ="Chlorhexidine treatment", y="Top 15 Genera")
+
+ITS_Rel_chg
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, ".pdf"), width = 40, height = 6) 
+print(ITS_Rel_chg)
+dev.off()
+
+
+#Save as image
+png(filename = paste0(y, ".png"), width = 6000, height = 2000, res = 300)
+print(ITS_Rel_chg) 
+dev.off()
+```
+
+```{r}
+y<-"ITS_Rel_water"
+
+ps <-water_df
+order<-c("Other",top_genus_names_w)
+ps$Genus<-factor(ps$Genus, levels = order)
+
+
+ITS_Rel_water<-ggplot(ps, aes(x=Patient_id, y=Genus, size = Abundance)) +
+  geom_point(alpha=0.7)+
+  facet_grid(~visit_2, scales = "free_x", space = "free_x", labeller = labeller(
+  visit_2 = c(
+    "Pre-treatment"  = "Pre-trt\n(n=26)",
+    "3 Months"       = "3 Months\n(n=20)",
+    "12 Months"      = "12 Months\n(n=14)",
+    "Post-treatment" = "Post-trt\n(n=17)"
+  )))+
+theme(strip.text = element_text(size=20),
+       panel.background = element_rect(fill="#fafafa"),
+   strip.background = element_blank(), 
+        axis.text.y = element_text(size=20,face ="italic"),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1,face = "bold"),
+        axis.text.x.bottom =  element_blank(),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26))+
+  labs(color = "visit", size = "Relative Abundance %", x ="Soap and water treatment", y="Top 15 Genera")
+
+ITS_Rel_water
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, ".pdf"), width = 40, height = 6) # Adjust dimensions as needed
+print(ITS_Rel_water) 
+dev.off()
+
+
+#Save as image
+png(filename = paste0(y, ".png"), width = 6000, height = 2000, res = 300)
+print(ITS_Rel_water) 
+dev.off()
+```
+
+
+
+
+#Supplemental Figure 2B: Alpha diversity
+
+#Water
+```{r}
+library(ggplot2)
+library(ggstatsplot)
+library(ggpubr)
+
+#Pick_phyloseq group
+water_rare_genus_ITS<-subset_samples(ps_rare_genus_ITS, treatgroup == "0")
+ps <- water_rare_genus_ITS
+
+#Order factors correctly
+sample_data(ps)$visit_2 <- factor(sample_data(ps)$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+
+#Title of graph *CHANGE EACH TIME
+x <-"Alpha_Diversity_shannon_change_overtime_water_samples_ITS"
+
+#Check if adjusted p-values align with results determined later
+rich <- estimate_richness(ps, measures = "Shannon")
+df <- cbind(as.data.frame(sample_data(ps)), rich)
+
+stats<-compare_means(Shannon ~ visit_2,
+              data = df,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+#Include n-values
+meta<-sample_data(ps)
+
+#Generate plot 
+water_alpha_diversity_shannon_ITS<- plot_richness(ps, x="visit_2", title = NULL, measures=c("Shannon"), color = "visit_2")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.10,
+  size = 3,
+  alpha = 1)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+ scale_y_continuous(limits = c(0,4.2))+
+   scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=26)",  
+  "3 Months" = "3 Months\n(n=20)",
+  "12 Months" = "12 Months\n(n=14)",
+  "Post-treatment" = "Post-trt\n(n=17)"))+
+  theme_classic(base_size = 20)+
+ theme(strip.background = , 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none",
+        strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     position = "top",
+                     size = 12,
+                     label.y = c(2.5,3.2,3.9),
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Soap and water treatment", y = "Shannon diversity index")
+
+#remove defult points
+water_alpha_diversity_shannon_ITS$layers <- water_alpha_diversity_shannon_ITS$layers[-1]
+
+water_alpha_diversity_shannon_ITS
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 6.67, height = 8.1) 
+print(water_alpha_diversity_shannon_ITS) 
+dev.off()
+
+#Save as image
+png(filename = paste0(x, ".png"), width = 2000, height = 2500, res = 300)
+print(water_alpha_diversity_shannon_ITS) 
+dev.off()
+```
+
+#Average diversity
+```{r}
+ps<-water_rare_genus_ITS
+rich <- estimate_richness(ps, measures = "Shannon")
+interest_group <- cbind(as.data.frame(sample_data(ps)), rich)
+
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean = mean(Shannon, na.rm = TRUE),
+    sd = sd(Shannon, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n-1) * se,
+    ci95_high = mean + qt(0.975, df = n-1) * se
+  )
+
+
+summary_stats
+```
+
+
+#CHG
+```{r}
+library(ggplot2)
+library(ggstatsplot)
+library(ggpubr)
+
+#Pick_phyloseq group
+chg_rare_genus_ITS<-subset_samples(ps_rare_genus_ITS, treatgroup == "1")
+ps <- chg_rare_genus_ITS
+
+#Order factors correctly
+sample_data(ps)$visit_2 <- factor(sample_data(ps)$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+
+#Title of graph *CHANGE EACH TIME
+x <-"Alpha_Diversity_shannon_change_overtime_chg_samples_ITS"
+
+#Check if adjusted p-values align with results determined later
+rich <- estimate_richness(ps, measures = "Shannon")
+df <- cbind(as.data.frame(sample_data(ps)), rich)
+
+stats<-compare_means(Shannon ~ visit_2,
+              data = df,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+#Include n-values
+meta<-sample_data(ps)
+
+#Generate plot 
+chg_alpha_diversity_shannon_ITS<- plot_richness(ps, x="visit_2", title = NULL, measures=c("Shannon"), color = "visit_2")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.10,
+  size = 3,
+  alpha = 1)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+ scale_y_continuous(limits = c(0,4.2))+
+   scale_x_discrete(labels =c("Pre-treatment" = "Pre-trt\n(n=26)",  
+  "3 Months" = "3 Months\n(n=25)",
+  "12 Months" = "12 Months\n(n=17)",
+  "Post-treatment" = "Post-trt\n(n=28)"))+
+  theme_classic(base_size = 20)+
+ theme(strip.background = , 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none",
+        strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     position = "top",
+                     size = 12,
+                     label.y = c(2.5,3.2,3.9),
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Chlorhexidine treatment", y = "Shannon diversity index")
+
+#remove defult points
+chg_alpha_diversity_shannon_ITS$layers <- chg_alpha_diversity_shannon_ITS$layers[-1]
+
+chg_alpha_diversity_shannon_ITS
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 6.67, height = 8.1) 
+print(chg_alpha_diversity_shannon_ITS) 
+dev.off()
+
+#Save as image
+png(filename = paste0(x, ".png"), width = 2000, height = 2500, res = 300)
+print(chg_alpha_diversity_shannon_ITS) 
+dev.off()
+```
+
+#Average diversity
+```{r}
+ps<-chg_rare_genus_ITS
+rich <- estimate_richness(ps, measures = "Shannon")
+interest_group <- cbind(as.data.frame(sample_data(ps)), rich)
+
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean = mean(Shannon, na.rm = TRUE),
+    sd = sd(Shannon, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n-1) * se,
+    ci95_high = mean + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+#Merge Supplemental figure 2
+```{r}
+x <- "Supplemental_figure_2"
+
+Rel_chg <- ITS_Rel_chg + 
+  theme(plot.margin = margin(b = 30, t = 30, l = 30, r = 50),
+        legend.position = "none")
+
+Rel_water <- ITS_Rel_water + 
+  theme(plot.margin = margin(b = 30, t = 30, l = 30, r = 50),
+        legend.position = "bottom")
+
+Rel_ITS <- (Rel_chg / Rel_water) &
+  theme(plot.margin = margin(b = 30, t = 30, l = 30, r = 50),
+        legend.margin = margin(t = 15)) +
+  plot_layout(heights = c(1,1))
+
+alpha_ITS <- (chg_alpha_diversity_shannon_ITS / water_alpha_diversity_shannon_ITS) &
+  theme(plot.margin = margin(b = 30, t = 30, l = 30, r = 50))
+
+figure_2_s <- (Rel_ITS | alpha_ITS) +
+  plot_layout(widths = c(3,1.5))
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+figure_2_s
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+figure_2_s
+dev.off()
+```
+
+
+
+
+
+
+#Supplemental Figure 3A: Bioburden 
+
+#Graph of CHG bioburden box plot seperate 
+```{r}
+
+#Order factors correctly
+grouped_chg_dpcr$visit_2 <- factor(grouped_chg_dpcr$visit_2, levels = c("Pre-treatment (n=45)","3 Months (n=38)","12 Months (n=31)", "Post-treatment (n=34)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=45)","3 Months (n=38)"),c("Pre-treatment (n=45)","12 Months (n=31)"),c("Pre-treatment (n=45)","Post-treatment (n=34)"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means( log_Concentration ~ visit_2,
+              data = grouped_chg_dpcr,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y <-"bioburden_chg_boxplot"
+
+#Visualization 
+
+library(ggplot2)
+
+bioburden_boxplot_chg<-ggplot(grouped_chg_dpcr, aes(x=visit_2, y=log_Concentration, fill=visit_2))+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.15,
+  size = 2,
+  alpha = 0.5)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)  +
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=45)" = "Pre-trt\n(n=45)",  
+  "3 Months (n=38)" = " 3 Months\n(n=38)",
+  "12 Months (n=31)" = "12 Months\n(n=31)",
+  "Post-treatment (n=34)" = "Post-trt\n(n=34)"))+
+  theme_classic(base_size = 20)+
+  scale_y_continuous(
+  limits = c(0.5, 6.3),
+  breaks = seq(0, 5, 1),
+  expand = expansion(mult = c(0, 0))
+)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "none",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Chlorhexidine treatment", y = expression(bold("log"[10]* " Concentration")), colour = "Change from previous visit:")+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     label.y = c(4.3,5.0,5.7),
+                     size = 12,
+                     comparisons = comparisons)
+  
+bioburden_boxplot_chg
+```
+
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y,".png"), width = 3000, height = 2000, res = 300)
+bioburden_boxplot_chg # Replace with your actual graph object
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y,".pdf"), width = 14, height = 7) # Adjust dimensions as needed
+bioburden_boxplot_chg # Replace with your plot object
+dev.off()
+```
+
+#Average concentration
+```{r}
+interest_group<-grouped_chg_dpcr
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_dev = mean(log_Concentration, na.rm = TRUE),
+    sd_dev = sd(log_Concentration, na.rm = TRUE),
+    se = sd_dev / sqrt(n),
+    ci95_low  = mean_dev - qt(0.975, df = n-1) * se,
+    ci95_high = mean_dev + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+
+#Graph of water bioburden box plot seperate 
+```{r}
+#Order factors correctly
+grouped_water_dpcr$visit_2 <- factor(grouped_water_dpcr$visit_2, levels = c("Pre-treatment (n=38)","3 Months (n=32)","12 Months (n=28)","Post-treatment (n=31)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=38)","3 Months (n=32)"),c("Pre-treatment (n=38)","12 Months (n=28)"),c("Pre-treatment (n=38)","Post-treatment (n=31)"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means(log_Concentration ~ visit_2,
+              data = grouped_water_dpcr,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y <-"bioburden_water_boxplot"
+
+#Visualization 
+
+library(ggplot2)
+
+bioburden_boxplot_water<-ggplot(grouped_water_dpcr, aes(x=visit_2, y=log_Concentration, fill=visit_2))+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.15,
+  size = 2,
+  alpha = 0.5)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)  +
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=38)" = "Pre-trt\n(n=38)",  
+  "3 Months (n=32)" = " 3 Months\n(n=32)",
+  "12 Months (n=28)" = "12 Months\n(n=28)",
+  "Post-treatment (n=31)" = "Post-trt\n(n=31)"))+
+  theme_classic(base_size = 20)+
+  scale_y_continuous(
+  limits = c(0.5, 6.3),
+  breaks = seq(0, 5, 1),
+  expand = expansion(mult = c(0, 0))
+)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "none",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Soap and water treatment", y = expression(bold("log"[10]* " Concentration")), colour = "Change from previous visit:")+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     label.y = c(4.3,5.0,5.7),
+                     size = 12,
+                     comparisons = comparisons)
+  
+bioburden_boxplot_water
+```
+
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y,".png"), width = 3000, height = 2000, res = 300)
+bioburden_boxplot_water # Replace with your actual graph object
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y,".pdf"), width = 14, height = 7) # Adjust dimensions as needed
+bioburden_boxplot_water # Replace with your plot object
+dev.off()
+```
+
+#Average concentration
+```{r}
+interest_group<-grouped_water_dpcr
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_dev = mean(log_Concentration, na.rm = TRUE),
+    sd_dev = sd(log_Concentration, na.rm = TRUE),
+    se = sd_dev / sqrt(n),
+    ci95_low  = mean_dev - qt(0.975, df = n-1) * se,
+    ci95_high = mean_dev + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+
+#Supplemental Figure 3B:Bray-Curtis Change Overtime
+
+#CHG
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-chg_rare_ps
+
+sample_data(ps_bds)$visit_2 <- fct_recode(sample_data(ps_bds)$vcode_prevfootcomp, 
+                                        "Pre-trt" = "1", 
+                                        "3 Months" = "3", 
+                                        "12 Months" = "6",
+                                        "Post-trt" = "7")
+#set testing parameter
+x="visit_2"
+
+#Import tree
+phy_tree(ps_bds)<-qza_to_phyloseq(tree="/Users/michellebode/maryland/16S/processed_data/tree/rooted_tree.qza")
+ps_bds
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ visit_2, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_visit_chg<-ps_bds
+```
+
+
+#Graph
+```{r}
+y<-"Bray_Curtis_visit_chg"
+
+# Run NMDS 
+ordination_result <- ordinate(bray_visit_chg, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_visit_chg_plot<-plot_ordination(bray_visit_chg, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic(base_size = 20)+
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+  scale_color_manual(values = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF")) +
+  labs( title = "", color = "" )
+
+bray_visit_chg_plot
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_visit_chg_plot
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_visit_chg_plot
+dev.off()
+```
+
+
+#Water
+
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-water_rare_ps
+
+#reformat label
+sample_data(ps_bds)$visit_2 <- fct_recode(sample_data(ps_bds)$vcode_prevfootcomp, 
+                                        "Pre-trt" = "1", 
+                                        "3 Months" = "3", 
+                                        "12 Months" = "6",
+                                        "Post-trt" = "7")
+
+#set testing parameter
+x="visit_2"
+
+#Import tree
+phy_tree(ps_bds)<-qza_to_phyloseq(tree="/Users/michellebode/maryland/16S/processed_data/tree/rooted_tree.qza")
+ps_bds
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ visit_2, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_visit_water<-ps_bds
+```
+
+#Graph
+```{r}
+y<-"Bray_Curtis_visit_water"
+
+
+# Run NMDS 
+ordination_result <- ordinate(bray_visit_water, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_visit_water_plot<-plot_ordination(bray_visit_water, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+  scale_color_manual(values = c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF")) +
+  labs( title = "", color = "" )
+
+bray_visit_water_plot
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_visit_water_plot
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_visit_water_plot
+dev.off()
+```
+
+#Combine Graphs
+```{r}
+x<-"combined_BC_visit"
+
+# p1 has legend removed
+p1 <- bray_visit_chg_plot + 
+  theme(legend.position = "none") + 
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- bray_visit_water_plot + 
+   theme(legend.position = "bottom",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  labs(title = "Soap and water treatment") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_BC_visit <- p1 / p2 
+
+combined_BC_visit
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_BC_visit
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_BC_visit
+dev.off()
+```
+
+
+#Supplemental Figure 3C: Shift from visit 1 to visit 3
+
+#isolate treatment groups
+```{r}
+v1v3<-subset_samples(ps_rare_genus, vcode_prevfootcomp %in% c("1","3"))
+ps_rare_water<-subset_samples(v1v3, treatgroup == "0")
+ps_rare_chg<-subset_samples(v1v3, treatgroup == "1")
+
+# Keep only Patient_id that have both visit 1 and 3
+meta_c<-as.data.frame(sample_data(ps_rare_chg))
+valid_patients_chg <- meta_c %>%
+  group_by(Patient_id) %>%
+  filter(all(c("1", "3") %in% vcode_prevfootcomp)) %>%   # visit is probably character, so use "1","3"
+  pull(Patient_id) %>%                      # <- extract as vector
+  unique()
+
+ps_rare_chg <- prune_samples(sample_names(ps_rare_chg)[sample_data(ps_rare_chg)$Patient_id %in% valid_patients_chg],ps_rare_chg)
+
+meta_w<-as.data.frame(sample_data(ps_rare_water))
+valid_patients_water <- meta_w %>%
+  group_by(Patient_id) %>%
+  filter(all(c("1", "3") %in% vcode_prevfootcomp)) %>%   # visit is probably character, so use "1","3"
+  pull(Patient_id) %>%                      # <- extract as vector
+  unique()
+
+ps_rare_water <- prune_samples(sample_names(ps_rare_water)[sample_data(ps_rare_water)$Patient_id %in% valid_patients_water],ps_rare_water)
+
+ps_rare_chg
+ps_rare_water
+
+#determine number of patients
+length(unique(sample_data(ps_rare_chg)$Patient_id))
+length(unique(sample_data(ps_rare_water)$Patient_id))
+```
+
+#CHG
+
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(ps_rare_chg, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds<-rel_abundance 
+
+#Ps object with exact counts
+#ps_bds<-unique_genus
+
+#set testing parameter
+x="vcode_prevfootcomp"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+print("permanova")
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+bray_dist <- distance(ps_bds, method = "bray")
+permanova_result <- vegan::adonis2(bray_dist ~ vcode_prevfootcomp, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+```
+
+#Graphing differences
+```{r}
+y <- "Bray_Curtis_NMDS_Chg_1v3"
+
+#order
+meta <-as.data.frame(sample_data(ps_bds))
+meta$visit <- factor(meta$visit, levels = c("1", "3"), ordered = TRUE)
+sample_data(ps_bds) <- meta
+
+# Run NMDS 
+ordination_result <- ordinate(ps_bds, method = 'NMDS', distance = 'bray', k = 4)
+
+# Check stress
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+Bray_Curtis_NMDS_Chg_1v3<- plot_ordination(ps_bds, ordination_result, axes = c(1,2), color = "visit_2") +
+  geom_point(size =6, 
+             alpha =1)+
+  geom_point(
+    size = 6,
+    alpha = 1,
+    shape = 21,
+    stroke = 0.3,
+    color ="black") +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FFF86E"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+  )))+
+  geom_path(
+    aes(group = Patient_id),
+    data = function(df) df[order(df$Patient_id, df$visit_2), ],
+    arrow = arrow(type = "closed", length = unit(0.2, "inches")),
+    linewidth = 0.4,
+    color = "black",
+    alpha = 0.9
+  ) +
+ theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+       legend.position = "none",
+        legend.text =element_text(size=26,face ="italic"),
+       legend.title = element_text(size=26))+
+  labs(title = "", color = "")+
+  scale_color_manual(values = c("Pre-treatment"="#6BE0F2", "3 Months"="#FFF86E"))
+
+
+Bray_Curtis_NMDS_Chg_1v3
+```
+
+#print graphs
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 6) # Adjust dimensions as needed
+Bray_Curtis_NMDS_Chg_1v3 # Replace with your plot object
+dev.off()
+
+#Save plot as pdf
+setwd(f)
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 1500, res = 300)
+Bray_Curtis_NMDS_Chg_1v3  # Replace with your actual graph object
+dev.off()
+```
+
+
+#Water
+
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(ps_rare_water, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds<-rel_abundance 
+
+#Ps object with exact counts
+#ps_bds<-unique_genus
+
+#set testing parameter
+x="vcode_prevfootcomp"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+print("permanova")
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+bray_dist <- distance(ps_bds, method = "bray")
+permanova_result <- vegan::adonis2(bray_dist ~ vcode_prevfootcomp, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+```
+
+#Graphing differences
+```{r}
+y <- "Bray_Curtis_NMDS_water_1v3"
+
+#order
+meta <-as.data.frame(sample_data(ps_bds))
+meta$visit <- factor(meta$visit, levels = c("1", "3"), ordered = TRUE)
+sample_data(ps_bds) <- meta
+
+# Run NMDS 
+ordination_result <- ordinate(ps_bds, method = 'NMDS', distance = 'bray', k = 4)
+
+# Check stress
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+Bray_Curtis_NMDS_water_1v3<- plot_ordination(ps_bds, ordination_result, axes = c(1,2), color = "visit_2") +
+  geom_point(size =6, 
+             alpha =1)+
+  geom_point(
+    size = 6,
+    alpha = 1,
+    shape = 21,
+    stroke = 0.3,
+    color ="black") +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FFF86E"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+  )))+
+  geom_path(
+    aes(group = Patient_id),
+    data = function(df) df[order(df$Patient_id, df$visit_2), ],
+    arrow = arrow(type = "closed", length = unit(0.2, "inches")),
+    linewidth = 0.4,
+    color = "black",
+    alpha = 0.9
+  ) +
+ theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+       legend.position = "none",
+       legend.title = element_text(size=26),
+        legend.text =element_text(size=26,face ="italic"))+
+  labs(title = "", color = "")+
+  scale_color_manual(values = c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E"))
+
+
+Bray_Curtis_NMDS_water_1v3
+```
+
+#print graphs
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 6) 
+Bray_Curtis_NMDS_water_1v3
+dev.off()
+
+#Save plot as pdf
+setwd(f)
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 1500, res = 300)
+Bray_Curtis_NMDS_water_1v3
+dev.off()
+```
+
+#Combine Graphs
+```{r}
+x<-"combined_v1_v3"
+
+# p1 has legend removed
+p1 <- Bray_Curtis_NMDS_Chg_1v3 + 
+  theme(legend.position = "none") + 
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- Bray_Curtis_NMDS_water_1v3 + 
+   theme(legend.position = "bottom",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  labs(title = "Soap and water treatment") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_v1_v3 <- p1 / p2 
+
+combined_v1_v3
+
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_v1_v3
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_v1_v3
+dev.off()
+```
+
+
+#Merge supplemental figure 3 plots
+```{r}
+x <-"supplemental_figure_3_merged"
+
+
+bioburden_boxplot_chg_2 <-(bioburden_boxplot_chg/bioburden_boxplot_water) + theme(plot.margin = margin(b = 0,
+                                                                              t = 50,
+                                                                              r = 30,
+                                                                              l =50))
+
+
+combined_BC_visit_2 <- combined_BC_visit + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 50,
+                                            r = 50)) 
+
+combined_v1_v3_2 <- combined_v1_v3 + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 50,
+                                            r = 50)) 
+
+supplemental_figure_3<- (
+  bioburden_boxplot_chg_2 | 
+  combined_BC_visit_2 |
+  combined_v1_v3_2 
+) + 
+  plot_layout(widths = c(1,1,1))
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+supplemental_figure_3
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+supplemental_figure_3
+dev.off()
+```
+
+
+#Supplemental figure 4
+
+
+#Supplemental figure 4A:Staph boxplot
+
+#Graph of CHG bioburden box plot seperate 
+```{r}
+#Order factors correctly
+df_staph_chg$visit_2 <- factor(df_staph_chg$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means(Abundance~ visit_2,
+              data = df_staph_chg,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y <-"Staph_chg_boxplot"
+
+#Visualization 
+
+library(ggplot2)
+
+staph_boxplot_chg<-ggplot(df_staph_chg, aes(x=visit_2, y=Abundance, fill=visit_2))+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.15,
+  size = 2,
+  alpha = 0.5)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)  +
+  coord_cartesian(ylim = c(0, 135), clip = "off")+
+  scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=42)",  
+  "3 Months" = "3 Months\n(n=27)",
+  "12 Months" = "12 Months\n(n=25)",
+  "Post-treatment" = "Post-trt\n(n=28)"))+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "none",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Chlorhexidine treatment", y = expression(bold("Relative abundance of Staphylococcus %")))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     label.y = c(100,117,134),
+                     size = 12,
+                     comparisons = comparisons)
+  
+staph_boxplot_chg
+```
+
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y,".png"), width = 3000, height = 2000, res = 300)
+staph_boxplot_chg # Replace with your actual graph object
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y,".pdf"), width = 14, height = 7) # Adjust dimensions as needed
+staph_boxplot_chg # Replace with your plot object
+dev.off()
+```
+
+
+#Average Abundance
+```{r}
+interest_group<-df_staph_chg
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_conc = mean(Abundance, na.rm = TRUE),
+    sd_conc = sd(Abundance, na.rm = TRUE),
+    se = sd_conc / sqrt(n),
+    ci95_low  = mean_conc - qt(0.975, df = n-1) * se,
+    ci95_high = mean_conc + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+
+#Graph of water bioburden box plot seperate 
+```{r}
+#Order factors correctly
+df_staph_water$visit_2 <- factor(df_staph_water$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means(Abundance~ visit_2,
+              data = df_staph_water,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y <-"Staph_water_boxplot"
+
+#Visualization 
+
+library(ggplot2)
+
+staph_boxplot_water<-ggplot(df_staph_water, aes(x=visit_2, y=Abundance, fill=visit_2))+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.15,
+  size = 2,
+  alpha = 0.5)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)  +
+  coord_cartesian(ylim = c(0, 135), clip = "off")+
+  scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=27)",  
+  "3 Months" = "3 Months\n(n=24)",
+  "12 Months" = "12 Months\n(n=22)",
+  "Post-treatment" = "Post-trt\n(n=24)"))+
+  theme_classic(base_size = 20)+
+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "none",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Soap and water treatment", y = expression(bold("Relative abundance of Staphylococcus %")))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     label.y = c(100,117,134),
+                     size = 12,
+                     comparisons = comparisons)
+  
+staph_boxplot_water
+```
+
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y,".png"), width = 3000, height = 2000, res = 300)
+staph_boxplot_water # Replace with your actual graph object
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y,".pdf"), width = 14, height = 7) # Adjust dimensions as needed
+staph_boxplot_water # Replace with your plot object
+dev.off()
+```
+
+#Average Abundance
+```{r}
+interest_group<-df_staph_water
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_conc = mean(Abundance, na.rm = TRUE),
+    sd_conc = sd(Abundance, na.rm = TRUE),
+    se = sd_conc / sqrt(n),
+    ci95_low  = mean_conc - qt(0.975, df = n-1) * se,
+    ci95_high = mean_conc + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+#Supplemental figure 4B:Staph compared to bioburden
+
+#bioburden and staph corrleation
+```{r}
+correlation_water<-df_staph_water
+correlation_chg<-df_staph_chg
+
+merge_water_group<-merge(grouped_water_dpcr, correlation_water, by.x="SAMPLE_NAME", by.y="Sample")
+merge_chg_group<-merge(grouped_chg_dpcr, correlation_chg, by.x="SAMPLE_NAME", by.y="Sample")
+```
+
+```{r}
+staph_bioburden_chg<-ggplot(merge_chg_group, aes(y=log_Concentration, x=Abundance))+
+  #geom_line(colour = "black")+
+  geom_point(size = 3,
+             colour = "#557689")+
+    geom_smooth(
+    data = merge_chg_group,
+    aes(y = log_Concentration, x = Abundance),
+    method = "lm",
+    se = TRUE,
+    color = "#557689"
+  ) +
+
+  ## correlation
+  stat_cor(method = "spearman",
+    data = merge_chg_group,
+    aes(y = log_Concentration, x = Abundance),
+    label.x.npc = "middle",
+    label.y.npc = "right",
+    size = 6
+  ) +
+  geom_point(colour = "black", shape = 21, size = 3)+
+  #scale_colour_manual(values=c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E","12 Months"="#FCC44E","Post-treatment"="#69F5AF","Increase" = "#05A106", "Decrease" ="#D10A0A", "No change"="#A8A7A7"), breaks =c("Increase","Decrease"), guide = guide_legend(override.aes =list(linewidth =2, size = 12)))+
+  labs(title = "",  y = expression(bold("log"[10]* " Concentration")),, x = expression(bold("Relative abundance of Staphylococcus %")))+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "bottom",
+        legend.title =element_text(size=26))
+
+staph_bioburden_chg
+```
+
+```{r}
+staph_bioburden_water<-ggplot(merge_water_group, aes(y=log_Concentration, x=Abundance))+
+  #geom_line(colour = "black")+
+  geom_point(size = 3,
+             colour = "#557689")+
+    geom_smooth(
+    data = merge_water_group,
+    aes(y = log_Concentration, x = Abundance),
+    method = "lm",
+    se = TRUE,
+    color = "#557689"
+  ) +
+
+  ## correlation
+  stat_cor(method = "spearman",
+    data = merge_water_group,
+    aes(y = log_Concentration, x = Abundance),
+    label.x.npc = "right",
+    label.y.npc = "bottom",
+    size = 6
+  ) +
+  geom_point(colour = "black", shape = 21, size = 3)+
+  #scale_colour_manual(values=c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E","12 Months"="#FCC44E","Post-treatment"="#69F5AF","Increase" = "#05A106", "Decrease" ="#D10A0A", "No change"="#A8A7A7"), breaks =c("Increase","Decrease"), guide = guide_legend(override.aes =list(linewidth =2, size = 12)))+
+  labs(title = "",  y = expression(bold("log"[10]* " Concentration")),, x = expression(bold("Relative abundance of Staphylococcus %")))+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "bottom",
+        legend.title =element_text(size=26))
+
+staph_bioburden_water
+```
+
+#Combine Graphs
+```{r}
+x<-"combined_staph_bioburden"
+
+# p1 has legend removed
+p1 <- staph_bioburden_chg + 
+  theme(legend.position = "none") + 
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- staph_bioburden_water + 
+   theme(legend.position = "bottom",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  labs(title = "Soap and water treatment") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_staph_bioburden <- p1 / p2 
+
+combined_staph_bioburden
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_staph_bioburden
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_staph_bioburden
+dev.off()
+```
+
+#Merge supplemental figure 4 plots
+```{r}
+x <-"supplemental_figure_4_merged"
+
+
+staph_boxplot_2 <-(staph_boxplot_chg/staph_boxplot_water) + theme(plot.margin = margin(b = 0,
+                                                                              t = 50,
+                                                                              r = 30,
+                                                                              l =50))
+
+combined_staph_bioburden_2 <-combined_staph_bioburden + theme(plot.margin = margin(b = 0,
+                                                                              t = 50,
+                                                                              r = 30,
+                                                                              l =50))
+
+supplemental_figure_4<- (
+  staph_boxplot_2 | 
+  combined_staph_bioburden_2
+) + 
+  plot_layout(widths = c(1,1))
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+supplemental_figure_4
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+supplemental_figure_4
+dev.off()
+```
+
+
+
+#Supplemental figure 5
+
+
+#Supplemental figure 5A:Other genera box-plots
+
+#Graph of CHG bioburden box plot seperate 
+```{r}
+#Order factors correctly
+ps_tab_genus_df_c$visit_2 <- factor(ps_tab_genus_df_c$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means(Abundance~ visit_2,
+              data = ps_tab_genus_df_c,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y <-"Taxa_chg_boxplot"
+
+#Visualization 
+
+library(ggplot2)
+
+taxa_boxplot_chg<-ggplot(ps_tab_genus_df_c, aes(x=visit_2, y=Abundance, fill=visit_2))+
+  facet_wrap(~Genus,scales="free_y")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.15,
+  size = 2,
+  alpha = 0.5)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)  +
+  #coord_cartesian(ylim = c(0, 135), clip = "off")+
+  scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=42)",  
+  "3 Months" = "3 Months\n(n=27)",
+  "12 Months" = "12 Months\n(n=25)",
+  "Post-treatment" = "Post-trt\n(n=28)"))+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+       strip.text = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "none",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Chlorhexidine treatment", y = expression(bold("Relative abundance of Staphylococcus %")))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     #label.y = c(100,117,134),
+                     size = 12,
+                     comparisons = comparisons)
+  
+taxa_boxplot_chg
+```
+
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y,".png"), width =  9400 , height = 12000, res = 300)
+taxa_boxplot_chg # Replace with your actual graph object
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y,".pdf"), width = 31.333, height =  28) 
+taxa_boxplot_chg # Replace with your plot object
+dev.off()
+```
+
+
+#Average Abundance
+```{r}
+interest_group<-df_staph_chg
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_conc = mean(Abundance, na.rm = TRUE),
+    sd_conc = sd(Abundance, na.rm = TRUE),
+    se = sd_conc / sqrt(n),
+    ci95_low  = mean_conc - qt(0.975, df = n-1) * se,
+    ci95_high = mean_conc + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+
+#Graph of water bioburden box plot seperate 
+```{r}
+#Order factors correctly
+df_staph_water$visit_2 <- factor(df_staph_water$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment","3 Months"),c("Pre-treatment","12 Months"),c("Pre-treatment","Post-treatment"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means(Abundance~ visit_2,
+              data = df_staph_water,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y <-"Staph_water_boxplot"
+
+#Visualization 
+
+library(ggplot2)
+
+staph_boxplot_water<-ggplot(df_staph_water, aes(x=visit_2, y=Abundance, fill=visit_2))+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.15,
+  size = 2,
+  alpha = 0.5)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)  +
+  coord_cartesian(ylim = c(0, 135), clip = "off")+
+  scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=27)",  
+  "3 Months" = "3 Months\n(n=24)",
+  "12 Months" = "12 Months\n(n=22)",
+  "Post-treatment" = "Post-trt\n(n=24)"))+
+  theme_classic(base_size = 20)+
+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "none",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Soap and water treatment", y = expression(bold("Relative abundance of Staphylococcus %")))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     label.y = c(100,117,134),
+                     size = 12,
+                     comparisons = comparisons)
+  
+staph_boxplot_water
+```
+
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y,".png"), width = 3000, height = 2000, res = 300)
+staph_boxplot_water # Replace with your actual graph object
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y,".pdf"), width = 14, height = 7) # Adjust dimensions as needed
+staph_boxplot_water # Replace with your plot object
+dev.off()
+```

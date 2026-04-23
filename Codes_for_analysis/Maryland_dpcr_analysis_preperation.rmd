@@ -1,0 +1,327 @@
+---
+title: "Maryland_dpcr_analysis_preperation"
+author: "Michelle Bode"
+output: html_document
+date: "2025-12-30"
+---
+
+#Set working directory
+```{r setup, include=TRUE}
+knitr::opts_knit$set(root.dir = "[input pathway to directory with data]")
+
+#Directory for saving figures
+f<-"[input pathway to where figure will be saved]"
+```
+
+#Import data
+```{r}
+raw_dpcr<-read.csv("dpcr_16S.csv", header = TRUE, sep = ",")
+raw_dpcr
+```
+
+#Remove samples that are not included in analysis
+```{r}
+#Remove patients with current complication on the same foot
+clean_dpcr <-subset(raw_dpcr, !Patient_id %in% c("1016","1037","1072","1194"))
+clean_dpcr
+```
+
+#Format metadata
+```{r}
+#Isolate study group
+visit_of_interest<-clean_dpcr
+
+#convert factors to correct format
+clean_merge<-visit_of_interest
+clean_merge[,2:6] <-lapply(clean_merge[,2:6], as.numeric)
+clean_merge[,7:41]<-lapply(clean_merge[,7:41],as.factor)
+
+#Correct names written with doubles
+clean_merge$visit[clean_merge$visit %in% c("\"6,4\"", "6,4", "64")] <-"4"
+clean_merge$visit[clean_merge$visit %in% c("\"6,5\"", "6,5", "65")] <-"5"
+
+#Change number representations into label names for figures
+clean_merge$treatgroup_2<-ifelse(clean_merge[["treatgroup"]] %in% c("0"),"Soap and water","Chlorhexidine")
+clean_merge$treatment_active <- ifelse(clean_merge$vcode_prevfootcomp %in% c("1","7"),"No active treatment (pre-trt + post-trt","Active treatment (3 months + 12 months)")
+clean_merge$visit_2 <- fct_recode(clean_merge$vcode_prevfootcomp, 
+                                        "Pre-treatment" = "1", 
+                                        "3 Months" = "3", 
+                                        "12 Months" = "6",
+                                        "Post-treatment" = "7")
+
+#Create column with log10 scale for concentration
+clean_merge$log_Concentration<-log10(clean_merge$Concentration + 1)
+
+clean_merge
+
+#Remove samples with no concentration
+clean_merge<-subset(clean_merge, log_Concentration != "0")
+clean_merge
+
+#summary of data
+print("total samples")
+nrow(clean_merge)
+
+print("concentration summary")
+summary(clean_merge$Concentration)
+
+```
+
+#Prep samples for visualization
+```{r}
+visit_of_interest <- clean_merge %>%
+  group_by(Patient_id) %>%
+  arrange(Patient_id, vcode_prevfootcomp) %>%
+  mutate(
+    prev_code  = lag(vcode_prevfootcomp),
+    prev_value = lag(log_Concentration),
+    has_1 = any(vcode_prevfootcomp == 1),
+    is_consecutive = case_when(
+      vcode_prevfootcomp == 1 ~ NA,
+      vcode_prevfootcomp == 3 & has_1 ~ TRUE,
+      vcode_prevfootcomp == 3 & !has_1 ~ FALSE,
+      vcode_prevfootcomp == 6 & prev_code == 3 ~ TRUE,
+      vcode_prevfootcomp == 6 & prev_code == 1 ~ FALSE,
+      vcode_prevfootcomp == 6 & is.na(prev_code) ~ FALSE,
+      vcode_prevfootcomp == 7 & prev_code == 6 ~ TRUE,
+      vcode_prevfootcomp == 7 & prev_code %in% c(1,3) ~ FALSE,
+      vcode_prevfootcomp == 7 & is.na(prev_code) ~ FALSE,
+      TRUE ~ NA
+    ),
+    Patient_change = case_when(
+      is_consecutive == TRUE & log_Concentration > prev_value ~ "Increase",
+      is_consecutive == TRUE & log_Concentration < prev_value ~ "Decrease",
+      is_consecutive == TRUE & log_Concentration == prev_value ~ "No change",
+      is_consecutive == FALSE ~ "Missing previous visit",
+      TRUE ~ NA_character_        
+    ),
+    Change_for_segment = lead(Patient_change),
+    change_amount = log_Concentration - prev_value
+  ) %>%
+  ungroup()
+
+
+#Separate treatment groups
+chg_dpcr<-subset(visit_of_interest, treatgroup == "1")
+water_dpcr<-subset(visit_of_interest, treatgroup == "0")
+
+#Add number of samples to labels
+#For CHG
+grouped_chg_dpcr<-chg_dpcr %>% 
+  group_by(visit_2) %>% 
+  mutate(n=n()) %>% 
+  mutate(visit_2 = paste0(visit_2, " (n=",n,")")) 
+grouped_chg_dpcr$visit_2
+
+#For water
+grouped_water_dpcr<-water_dpcr %>% 
+  group_by(visit_2) %>% 
+  mutate(n=n()) %>% 
+  mutate(visit_2 = paste0(visit_2, " (n=",n,")")) 
+grouped_water_dpcr$visit_2
+```
+
+
+#Water bioburden stats
+
+#Percent increase and decrease
+```{r}
+interest_group<-grouped_water_dpcr
+
+meta_data<-interest_group[,c("SAMPLE_NAME","Patient_id","log_Concentration","vcode_prevfootcomp","Patient_change","change_amount")]
+
+
+#3 months
+Months_3<-subset(meta_data, vcode_prevfootcomp == "3")
+
+print(" 3 month total")
+t<-nrow(Months_3)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_3, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+
+print("Increase")
+inc<-subset(Months_3, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_3, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#12 months
+Months_12<-subset(meta_data, vcode_prevfootcomp == "6")
+
+print("12 month total")
+t<-nrow(Months_12)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_12, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(Months_12, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_12, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#Post
+post<-subset(meta_data, vcode_prevfootcomp == "7")
+
+print("post total")
+t<-nrow(post)
+t
+
+print("Missing previous visit")
+nc<-subset(post, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(post, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(post, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+```
+
+#Chg bioburden stats
+
+#Percent increase and decrease
+```{r}
+interest_group<-grouped_chg_dpcr
+
+meta_data<-interest_group[,c("SAMPLE_NAME","Patient_id","log_Concentration","vcode_prevfootcomp","Patient_change","change_amount")]
+meta_data
+
+#3 months
+Months_3<-subset(meta_data, vcode_prevfootcomp == "3")
+
+print(" 3 month total")
+t<-nrow(Months_3)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_3, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(Months_3, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_3, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#12 months
+Months_12<-subset(meta_data, vcode_prevfootcomp == "6")
+
+print("12 month total")
+t<-nrow(Months_12)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_12, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(Months_12, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_12, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#Post
+post<-subset(meta_data, vcode_prevfootcomp == "7")
+
+print("post total")
+t<-nrow(post)
+t
+
+print("Missing previous visit")
+nc<-subset(post, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(post, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(post, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+```
+
+

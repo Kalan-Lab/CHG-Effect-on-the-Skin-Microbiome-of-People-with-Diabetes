@@ -1,0 +1,709 @@
+---
+title: "Maryland_ITS_Analysis_Prep_Final"
+author: "Michelle Bode"
+output: html_document
+date: "2026-01-06"
+---
+
+#Set working directory
+```{r setup, include=TRUE}
+knitr::opts_knit$set(root.dir = "[input pathway to directory with data]")
+
+#Directory for saving figures
+f<-"[input pathway to where figure will be saved]"
+```
+
+#Install required packages
+```{r}
+#BiocManager::install("phyloseq")
+#install.packages("dplyr")
+#install.packages("ggpubr")
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("BiocManager")
+#BiocManager::install("ALDEx2")
+#BiocManager::install("decontam")
+#install.packages(c("devtools", "httr", "jsonlite", "tidyverse", "reticulate"))
+#devtools::install_github("jbisanz/qiime2R")
+#install.packages("vegan")
+#BiocManager::install("decontam")
+```
+
+#Activate Packages
+```{r}
+library("ggplot2")
+library("patchwork")
+library("ggpubr")
+library("ALDEx2")
+library("phyloseq")
+library("dplyr")
+library("tidyverse")
+library ("ggplot2")
+library ("BiocManager")
+library("devtools")
+library("httr")
+library("jsonlite") 
+library("tidyverse")
+library("reticulate")
+library("qiime2R")
+library("vegan")
+library("decontam")
+```
+
+#Import data
+```{r}
+#Import raw data
+tax_table<-as.matrix(read.csv2("taxonomy_table_ITS.csv", sep=",", row.names=1))
+otu_table<-read.csv2("otu_table_ITS.csv", sep=",", row.names=1, check.names = FALSE)
+metadata_table<-read.csv2("metadata.csv", sep=",", row.names=1)
+
+#Merge to a phyloseq object
+ps_raw_ITS <- phyloseq(
+  otu_table(otu_table,taxa_are_rows = TRUE),
+  tax_table(tax_table),
+  sample_data(metadata_table))
+  
+ps_raw_ITS 
+```
+
+#Remove samples that are not included in analysis
+```{r}
+#Remove patients with current complication on the same foot
+ps_raw_analysis <-subset_samples(ps_raw_ITS, !Patient_id %in% c("1016","1037","1072","1194"))
+ps_raw_analysis <-prune_samples(sample_sums(ps_raw_analysis)>0, ps_raw_analysis)
+
+#view
+ps_raw_analysis
+```
+
+#Summary stats of patient samples that will be used in analysis (before filtering)
+```{r}
+meta_raw <- sample_data(ps_raw_analysis)
+
+#Total treatment group summary
+print("chg")
+chg<-subset(meta_raw, treatgroup == 1)
+print("chg total samples")
+nrow(chg)
+print("chg total patients")
+length(unique(chg$Patient_id))
+
+print("water")
+water<-subset(meta_raw, treatgroup == 0)
+print("water total samples")
+nrow(water)
+print("water total patients")
+length(unique(water$Patient_id))
+
+#Summary at each visit 
+print("chg visit breakdown")
+meta_chg<-chg
+print("pre-treatment")
+nrow(subset(meta_chg, vcode_prevfootcomp == 1))
+print("3 months")
+nrow(subset(meta_chg, vcode_prevfootcomp == 3))
+print("12 months")
+nrow(subset(meta_chg, vcode_prevfootcomp == 6))
+print("post-treatment")
+nrow(subset(meta_chg, vcode_prevfootcomp == 7))
+
+print("water visit breakdown")
+meta_water<-water
+print("pre-treatment")
+nrow(subset(meta_water, vcode_prevfootcomp == 1))
+print("3 months")
+nrow(subset(meta_water, vcode_prevfootcomp == 3))
+print("12 months")
+nrow(subset(meta_water, vcode_prevfootcomp == 6))
+print("post-treatment")
+nrow(subset(meta_water, vcode_prevfootcomp == 7))
+```
+
+#format metadata
+```{r}
+# Extract and convert sample_data to data frame
+sam_data <- as.data.frame(sample_data(ps_raw_analysis))
+
+#change names to right string vector. For example 1 vs 0 should be read as characters and not integers because the values aren't continuous they represent variables.
+sam_data[,c(1:5,7:12,14:35)] <-lapply(sam_data[,c(1:5,7:12,14:35)], as.character)
+
+#Change number representations into label names for figures
+sam_data$treatgroup_2<-ifelse(sam_data[["treatgroup"]] %in% c("0"),"Soap and water","Chlorhexidine")
+
+sam_data$treatment_active <- ifelse(sam_data$vcode_prevfootcomp %in% c("1","7"),"No active treatment (pre-trt + post-trt)","Active treatment (3 months + 12 months)")
+
+#Rename visits
+sam_data$visit_2 <- fct_recode(sam_data$vcode_prevfootcomp, 
+                                        "Pre-treatment" = "1", 
+                                        "3 Months" = "3", 
+                                        "12 Months" = "6",
+                                        "Post-treatment" = "7")
+
+#Update phyloseq object
+ps_clean_metadata<-ps_raw_analysis
+sample_data(ps_clean_metadata)<-as.data.frame(sam_data)
+```
+
+#View if top distributed taxa are identified
+```{r}
+#Isolate otu tables
+feature_counts<-data.frame(otu_table(ps_clean_metadata))
+
+#Count cells in rows greater than zero (ie. how many samples have that feature)
+clean_row<-rowSums(feature_counts > 0)
+
+#Organize from greatest to least
+ordered_feautres <- clean_row[order(-clean_row)]
+
+#Check data
+ordered_feautres
+
+#Convert to data.frame
+counts_df <-data.frame(sample_counts = ordered_feautres)
+
+#View
+counts_df
+
+#isolate taxonomy data
+taxonomy_data<-data.frame(tax_table(ps_clean_metadata))
+
+#merge taxonomy and otu data
+all_wound_count<-merge(taxonomy_data,counts_df, by="row.names", all=TRUE)
+
+#make column headers a row
+colnames(all_wound_count)[1]<-"OTU ID"
+
+#remove na
+clean_wound_count <- all_wound_count %>% filter(!is.na(sample_counts))
+
+#Order by sample count
+ordered_clean_wound<-clean_wound_count[order(-clean_wound_count$sample_counts),]
+
+#Check samples
+ordered_clean_wound
+```
+
+#Add genus names for missing top taxa (identified using BLAST+ on the NCBI website)
+```{r}
+# Create the OTU-to-Genus mapping data frame
+otu_to_genus <- data.frame(
+  OTU_ID = c("21b7198768350673f6373f807a0dc3f6","403fdd28fac726454c161ffb1d3a393d","81aa1b36cd9303696bc03435d0947bb1","9150863e1ac79fa37b4a2f74a4326f18","d0c33b0f89767b49ea3ac2673609c39e","26de6680481d022ad25fda417b89e40a","74f9ddbe696b88d5ea6a327519622423","6c1c9d1e92b43cf4e54c083ec3a15f37"),
+  Genus = c("Candidozyma"," Chaetomium","f_Ustilaginaceae","o_Saccharomycetales","Malassezia", "c_Sordariomycetes","o_Chaetothyriales","o_Agaricales"))
+
+# Extract the taxonomy table from the phyloseq object
+tax_table_df <- as.data.frame(tax_table(ps_clean_metadata))
+
+# Update the Genus column based on the OTU-to-Genus mapping
+tax_table_df$Genus <- ifelse(
+  rownames(tax_table_df) %in% otu_to_genus$OTU_ID, 
+  otu_to_genus$Genus[match(rownames(tax_table_df), otu_to_genus$OTU_ID)], 
+  tax_table_df$Genus
+)
+
+# Replace the updated taxonomy table in the phyloseq object
+tax_table(ps_clean_metadata) <- as.matrix(tax_table_df)
+
+# View the updated taxonomy table for the specific OTUs
+tax_table_df[otu_to_genus$OTU_ID, ]
+
+ps_clean_metadata
+```
+
+#Only keep fungi 
+```{r}
+#create copy with new name
+ps_fungi<-ps_clean_metadata
+
+# Access the sample data
+taxonomy <- as.data.frame(tax_table(ps_fungi))
+
+#See how many are not fungi 
+taxonomy_non_fungi <-subset(taxonomy, Kingdom != "Fungi")
+print("How many non fungi ")
+nrow(taxonomy_non_fungi )
+print("summary of reads lost")
+ps_non_fungi<-subset_taxa(ps_fungi, Kingdom != "Fungi")
+summary(sample_sums(ps_non_fungi))
+summary(taxa_sums(ps_non_fungi))
+
+# Keep only samples identified as fungi 
+taxonomy_filtered <-subset(taxonomy, Kingdom == "Fungi")
+
+#see how many were lost
+print("How many removed")
+nrow(taxonomy) - nrow(taxonomy_filtered)
+
+#update phyloseq
+tax_table(ps_fungi )<-as.matrix(taxonomy_filtered)
+
+#view
+ps_fungi 
+```
+
+#View distribution of taxonomic identification
+```{r}
+library(tibble)
+unidentifed_taxa<-tax_table(ps_fungi )
+
+#counts total number identified at each taxonomic level
+identifed <- colSums(!is.na(unidentifed_taxa))
+
+#labels counts as Identified and makes Taxonomic level a column
+labeled_counts<-data.frame(Identified = identifed)
+taxonomy_set <-rownames_to_column(labeled_counts, var="Taxonomic Level")
+taxonomy_set
+
+# Extract the value for the "Kingdom" row in the "Identified" column
+sum_value <- taxonomy_set$Identified[taxonomy_set$`Taxonomic Level`=="Kingdom"]
+
+# calculate proportion identified
+x <- taxonomy_set$Identified
+taxonomy_set$`Percent Identified` <- x/sum_value*100 
+
+#Ensures results are displayed in this order  
+taxonomy_set$`Taxonomic Level` <- factor(taxonomy_set$`Taxonomic Level`, levels = c("Kingdom","Phylum","Class","Order","Family","Genus","Species"))
+
+#Graph Results
+taxonomy_graph <-ggplot(taxonomy_set, aes(x=`Taxonomic Level`, y= `Percent Identified`))+
+  geom_bar(stat = "identity", fill="steelblue")+
+  theme_classic()+
+  labs(title = "Percent of features identified to each taxanomic level", x = "Taxonomic Level", y = "Percent Identified")+
+  theme(strip.background = element_blank(), axis.text.x.bottom = element_text(angle = -90))
+
+taxonomy_graph 
+
+
+#Save graph
+
+setwd(f)
+
+#Save pdf
+pdf(file = "Percent_of_features_identified_to_each_taxanomic_level.pdf",width = 10, height = 6) 
+print(taxonomy_graph) # Replace with your plot object
+dev.off()
+
+#Save png
+png(file = "Percent_of_features_identified_to_each_taxanomic_level.png", width = 2500, height = 1500, res = 300)
+
+print(taxonomy_graph) # Replace with your plot object
+dev.off()
+```
+
+#Remove empty samples and low abundant
+```{r}
+#Remove empty samples and low abundant taxa
+remove_empty_1_ps<-ps_fungi 
+
+#Remove empty samples
+remove_empty_1_ps<-prune_samples(sample_sums(remove_empty_1_ps) > 0, remove_empty_1_ps)
+
+
+#Remove very low abundant features 
+remove_low_ps<-prune_taxa(taxa_sums(remove_empty_1_ps)>5, remove_empty_1_ps) 
+remove_low_ps
+```
+
+#Filter out contaminants 
+```{r}
+ps_filter<-remove_low_ps
+
+#Separate metadata
+sample_data<-sample_data(ps_filter)
+
+#Create column with row_names
+sample_data$Sample_name<-rownames(sample_data)
+
+#Replace negative controls with samples with NA
+sample_data$Sample_name<-gsub("NEG",NA,sample_data$Sample_name)
+sample_data$Sample_name<-gsub("NC",NA,sample_data$Sample_name)
+sample_data$Sample_name[is.na(sample_data$Sample_name)] <- "Neg"
+
+#Update phyloseq
+sample_data(ps_filter)<-sample_data
+
+#Identifies all negative controls and created a "is.neg" column
+sample_data(ps_filter)$is.neg <- sample_data(ps_filter)$Sample_name == "Neg"
+
+#filters contaminants based on prevalence in negative control compared to samples
+contamdf.prev <- isContaminant(ps_filter, method="prevalence", neg= "is.neg")
+
+print("Number of contaminant taxa")
+table(contamdf.prev$contaminant)
+
+#prune taxa to only include noncontaminated sequences
+print("After contaminant cleaning")
+ps.noncontam <- prune_taxa(!contamdf.prev$contaminant, ps_filter)
+ps.noncontam #? taxa
+```
+
+#View Contaminanted Taxa
+```{r}
+# Extract the contaminant taxa (those labeled as TRUE)
+contaminant_taxa <- rownames(contamdf.prev[contamdf.prev$contaminant == TRUE, ])
+
+# Extract taxonomy table for the contaminant taxa
+tax_table_contaminants <- tax_table(ps_filter)[contaminant_taxa, ]
+
+#view counts of contaminants before removal
+clean_otu<-otu_table(remove_low_ps)
+names<-rownames(tax_table_contaminants)
+count_present<-clean_otu[rownames(clean_otu) %in% names, ]
+total_count_present<-rowSums(count_present)
+summary(total_count_present)
+
+# View the taxonomy of the contaminants
+print("contaminany names")
+tax_table_contaminants
+total_count_present
+```
+
+#Remove negative and positive controls from analysis
+```{r}
+# Create a new phyloseq object without negative controls
+ps_clean <- prune_samples(!is.na(sample_data(ps.noncontam)$Patient_id), ps.noncontam)
+
+# Check the resulting phyloseq object
+removed_neg_controls<-sample_data(ps_clean)$Sample_name
+
+ps_clean 
+```
+
+#Remove empty samples 
+```{r}
+#Remove empty samples and low abundant taxa
+remove_empty_2_ps<-ps_clean
+
+#Remove empty samples
+remove_empty_2_ps<-prune_samples(sample_sums(remove_empty_2_ps) > 0, remove_empty_2_ps)
+
+remove_empty_2_ps
+```
+
+
+#Summary stats of patient samples that will be used in analysis (after filtering)
+```{r}
+#Subset analysis group
+ps_clean_analysis <-subset_samples(remove_empty_2_ps, prevfootcompanalysis == "1")
+
+ps_clean_analysis <-prune_samples(sample_sums(ps_clean_analysis)>0, ps_clean_analysis)
+meta_raw <- sample_data(ps_clean_analysis)
+
+#Total treatment group summary
+print("chg")
+chg<-subset(meta_raw, treatgroup == 1)
+print("chg total samples")
+nrow(chg)
+print("chg total patients")
+length(unique(chg$Patient_id))
+
+print("water")
+water<-subset(meta_raw, treatgroup == 0)
+print("water total samples")
+nrow(water)
+print("water total patients")
+length(unique(water$Patient_id))
+
+#Summary at each visit 
+print("chg visit breakdown")
+meta_chg<-chg
+print("pre-treatment")
+nrow(subset(meta_chg, vcode_prevfootcomp == 1))
+print("3 months")
+nrow(subset(meta_chg, vcode_prevfootcomp == 3))
+print("12 months")
+nrow(subset(meta_chg, vcode_prevfootcomp == 6))
+print("post-treatment")
+nrow(subset(meta_chg, vcode_prevfootcomp == 7))
+
+print("water visit breakdown")
+meta_water<-water
+print("pre-treatment")
+nrow(subset(meta_water, vcode_prevfootcomp == 1))
+print("3 months")
+nrow(subset(meta_water, vcode_prevfootcomp == 3))
+print("12 months")
+nrow(subset(meta_water, vcode_prevfootcomp == 6))
+print("post-treatment")
+nrow(subset(meta_water, vcode_prevfootcomp == 7))
+
+#Summarize sample size
+summary(sample_sums(ps_clean_analysis))
+
+```
+
+#Prepare for normalization
+```{r}
+#Pick data type for analysis 
+ps_all_samples <-ps_clean_analysis
+
+#Isolate OTU Table 
+otus <-as.matrix(otu_table(ps_all_samples))
+
+#switch column and header
+flipped_otu <- t(otus)
+flipped_clean_otus <-as.data.frame(flipped_otu)
+flipped_clean_otus
+
+#generate rarefaction curves
+vegan::rarecurve(flipped_clean_otus, step = 5, col = "blue", cex = 0.5, label =FALSE, ylim =c(0,40), xlim =c(0,4000))
+```
+
+#Removal for rarefraction minimum
+```{r}
+
+#remove samples below 
+clean_otu <- otus[,colSums(otus) > 700 ]
+
+#look at count distribution in samples after removal
+clean_otu_stats<-summary(colSums(clean_otu))
+
+print("distribution of features in samples")
+clean_otu_stats
+
+print("percent of samples maintained")
+ncol(clean_otu)
+ncol(clean_otu)/ncol(otus)
+```
+
+#Check sample distribution (after rarefaction minimum cutoff)
+```{r}
+#Select sample for viewing
+ps_min_removed<-ps_clean_analysis
+otu_table(ps_min_removed)<-clean_otu
+meta_raw <- sample_data(ps_min_removed)
+
+#Total treatment group summary
+print("chg")
+chg<-subset(meta_raw, treatgroup == 1)
+print("chg total samples")
+nrow(chg)
+print("chg total patients")
+length(unique(chg$Patient_id))
+
+print("water")
+water<-subset(meta_raw, treatgroup == 0)
+print("water total samples")
+nrow(water)
+print("water total patients")
+length(unique(water$Patient_id))
+
+#Summary at each visit 
+print("chg visit breakdown")
+meta_chg<-chg
+print("pre-treatment")
+nrow(subset(meta_chg, vcode_prevfootcomp == 1))
+print("3 months")
+nrow(subset(meta_chg, vcode_prevfootcomp == 3))
+print("12 months")
+nrow(subset(meta_chg, vcode_prevfootcomp == 6))
+print("post-treatment")
+nrow(subset(meta_chg, vcode_prevfootcomp == 7))
+
+print("water visit breakdown")
+meta_water<-water
+print("pre-treatment")
+nrow(subset(meta_water, vcode_prevfootcomp == 1))
+print("3 months")
+nrow(subset(meta_water, vcode_prevfootcomp == 3))
+print("12 months")
+nrow(subset(meta_water, vcode_prevfootcomp == 6))
+print("post-treatment")
+nrow(subset(meta_water, vcode_prevfootcomp == 7))
+
+#Summarize sample size
+summary(sample_sums(ps_min_removed))
+```
+
+#Remove empty features
+```{r}
+#Check number of empty features
+sum(rowSums(clean_otu)<1)
+
+#remove features (rows) with few counts
+clean_otu_c <- clean_otu[rowSums(clean_otu)>0,]
+
+#check with zeros removed
+sum(rowSums(clean_otu_c)<1)
+
+#Now check summary of features 
+summary(rowSums(clean_otu_c))
+```
+#Save non-rarefied without minimum 
+```{r}
+ps_nr_min700<-ps_all_samples
+
+otu_table(ps_nr_min700)<-clean_otu_c
+
+print("ps_nr_min700")
+ps_nr_min700
+```
+
+#Rarefraction
+```{r}
+#switch columns and header names
+df_matrix <- as.matrix(clean_otu_c)
+c_flipped_clean_otu <- t(df_matrix)
+c_flipped_clean_otu<-as.data.frame(c_flipped_clean_otu)
+
+#check changes
+c_flipped_clean_otu
+
+# Determine the minimum total number of individuals in any sample
+min_sample_size <- min(rowSums(c_flipped_clean_otu))
+min_sample_size
+
+#Generates rarefied otu tables. With multiple different results.
+rarefied_otu_data_1 <- vegan::rrarefy(c_flipped_clean_otu, min_sample_size)
+rarefied_otu_data_2 <- vegan::rrarefy(c_flipped_clean_otu, min_sample_size)
+rarefied_otu_data_3 <- vegan::rrarefy(c_flipped_clean_otu, min_sample_size)
+```
+
+#Remove empty features
+```{r}
+#Check empty feature count
+sum(colSums(rarefied_otu_data_1 )<1)
+
+#Remove empty features
+rarefied_otu_data_1 <- rarefied_otu_data_1[,colSums(rarefied_otu_data_1)>0]
+
+#Check empty feature count
+sum(colSums(rarefied_otu_data_2)<1)
+
+#Remove empty features
+rarefied_otu_data_2 <- rarefied_otu_data_2 [,colSums(rarefied_otu_data_2)>0]
+
+#Check empty feature count
+sum(colSums(rarefied_otu_data_3)<1)
+
+#Remove empty features
+rarefied_otu_data_3 <- rarefied_otu_data_3 [,colSums(rarefied_otu_data_3)>0]
+```
+
+```{r}
+#View summary of features
+stats_rare_1<- colSums(rarefied_otu_data_1)
+stats_rare_2<- colSums(rarefied_otu_data_2)
+stats_rare_3<- colSums(rarefied_otu_data_3)
+
+#View summary of samples
+stats_raref_1<- rowSums(rarefied_otu_data_1)
+stats_raref_2<- rowSums(rarefied_otu_data_2)
+stats_raref_3<- rowSums(rarefied_otu_data_3)
+
+print("feature summary")
+summary(stats_rare_1)
+summary(stats_rare_2)
+summary(stats_rare_3)
+
+print("sample summary")
+summary(stats_raref_1)
+summary(stats_raref_2)
+summary(stats_raref_3)
+
+```
+
+#Updated phyloseq object
+```{r}
+#transfer rarefied data back to ps objects
+ps_rare_1_ITS<-ps_all_samples
+ps_rare_2_ITS<-ps_all_samples
+ps_rare_3_ITS<-ps_all_samples
+
+otu_1 <- t(rarefied_otu_data_1)
+otu_1 <- otu_table(otu_1, taxa_are_rows = TRUE)
+otu_1 -> otu_table(ps_rare_1_ITS) 
+
+otu_2 <- t(rarefied_otu_data_2)
+otu_2 <- otu_table(otu_2, taxa_are_rows = TRUE)
+otu_2 -> otu_table(ps_rare_2_ITS) 
+
+otu_3 <- t(rarefied_otu_data_3)
+otu_3 <- otu_table(otu_3, taxa_are_rows = TRUE)
+otu_3 -> otu_table(ps_rare_3_ITS) 
+
+print("rarefraction_1")
+ps_rare_1_ITS
+print("rarefraction_2")
+ps_rare_2_ITS
+print("rarefraction_3")
+ps_rare_2_ITS
+```
+
+#Merge to genus level taxa 
+
+#Non-rarefaction data 
+```{r}
+#Add a different number for all NA in Genus
+Genus_unknown<-ps_nr_min700
+
+# Extract the taxonomy table from the phyloseq object
+tax_table_cleaned <- as.data.frame(tax_table(Genus_unknown))
+
+# Add a unique number to the NA values in the Phylum column
+tax_table_cleaned$Genus[is.na(tax_table_cleaned$Genus)] <- paste("Unknown_genus", seq_along(tax_table_cleaned$Genus[is.na(tax_table_cleaned$Genus)]), sep="_")
+
+# Update the taxonomy table in the phyloseq object
+tax_table(Genus_unknown) <- as.matrix(tax_table_cleaned)
+
+#Filter only unique Genus names (merge species with same names)
+unique_genus<-tax_glom(Genus_unknown, taxrank="Genus")
+
+ps_nr_genus_ITS<-unique_genus
+ps_nr_genus_ITS
+``` 
+
+
+#Average OTU counts all non rarefied
+```{r}
+interest_group <- taxa_sums(ps_nr_min700)
+
+summary_stats <- data.frame(value = interest_group) %>%
+  summarise(n = n(),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n - 1) * se,
+    ci95_high = mean + qt(0.975, df = n - 1) * se)
+
+ps_nr_min700
+summary_stats
+```
+
+#Average OTU counts all rarefied
+```{r}
+interest_group <- taxa_sums(ps_nr_genus_ITS)
+
+summary_stats <- data.frame(value = interest_group) %>%
+  summarise(n = n(),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n - 1) * se,
+    ci95_high = mean + qt(0.975, df = n - 1) * se)
+
+summary(interest_group)
+ps_nr_genus_ITS
+summary_stats
+```
+
+#Rarefaction data 
+```{r}
+#Add a different number for all NA in Genus
+Genus_unknown<-ps_rare_1_ITS
+
+# Extract the taxonomy table from the phyloseq object
+tax_table_cleaned <- as.data.frame(tax_table(Genus_unknown))
+
+# Add a unique number to the NA values in the Phylum column
+tax_table_cleaned$Genus[is.na(tax_table_cleaned$Genus)] <- paste("Unknown_genus", seq_along(tax_table_cleaned$Genus[is.na(tax_table_cleaned$Genus)]), sep="_")
+
+# Update the taxonomy table in the phyloseq object
+tax_table(Genus_unknown) <- as.matrix(tax_table_cleaned)
+
+#Filter only unique Genus names (merge species with same names)
+unique_genus<-tax_glom(Genus_unknown, taxrank="Genus")
+
+ps_rare_genus_ITS<-unique_genus
+ps_rare_genus_ITS
+``` 
+

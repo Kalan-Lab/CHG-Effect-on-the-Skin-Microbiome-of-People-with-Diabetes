@@ -1,0 +1,2496 @@
+---
+title: "Maryland_Final_Figures"
+author: "Michelle Bode"
+output: html_document
+date: "2025-12-15"
+---
+
+#Set working directory
+```{r setup, include=TRUE}
+knitr::opts_knit$set(root.dir = "[input pathway to directory with data]")
+
+#Directory for saving figures
+f<-"[input pathway to where figure will be saved]"
+```
+
+#Activate packages
+```{r}
+library("phyloseq")
+library("ggplot2")
+library("patchwork")
+library("ggpubr")
+library("ALDEx2")
+library("phyloseq")
+library("dplyr")
+library("tidyverse")
+library ("BiocManager")
+library("devtools")
+library("httr")
+library("jsonlite") 
+library("reticulate")
+library("qiime2R")
+library("vegan")
+library("decontam")
+```
+
+#Figure 1A: Bioburden 
+
+#Graph of CHG bioburden dotplot
+```{r}
+#Order factors correctly
+grouped_chg_dpcr$visit_2 <- factor(grouped_chg_dpcr$visit_2, levels = c("Pre-treatment (n=45)","3 Months (n=38)","12 Months (n=31)", "Post-treatment (n=34)"))
+
+y <-"bioburden_chg_dotplot"
+
+#Visualization 
+
+bioburden_dotplot_chg<-ggplot(grouped_chg_dpcr, aes(x=visit_2, y=log_Concentration, group = Patient_id))+
+  scale_colour_manual(values=c("Pre-treatment (n=45)"="#6BE0F2","3 Months (n=38)"="#FFF86E","12 Months (n=31)"="#FCC44E","Post-treatment (n=34)"="#69F5AF","Increase" = "#052BEB", "Decrease" ="#D10A0A", "Missing previous visit"="#A8A7A7","No change"="black"), breaks =c("Increase","Decrease","Missing previous visit"), guide = guide_legend(override.aes =list(linewidth =2, size =12)))+
+  geom_line(alpha = 0.8, size = 0.6, position=position_dodge(width=0.3), aes(colour=Change_for_segment)) + 
+  geom_point(position = position_dodge(width = 0.3), size = 5, aes(colour=visit_2))+
+  geom_point(position = position_dodge(width = 0.3), size = 5, colour="black", shape = 21)+
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=45)" = "Pre-trt\n(n=45)",  
+  "3 Months (n=38)" = " 3 Months\n(n=38)",
+  "12 Months (n=31)" = "12 Months\n(n=31)",
+  "Post-treatment (n=34)" = "Post-trt\n(n=34)"))+
+  theme_classic(base_size = 20)+
+  scale_y_continuous(
+  limits = c(0.5, 4.5),
+  breaks = seq(0, 5, 1),
+  expand = expansion(mult = c(0, 0))
+)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "bottom",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Chlorhexidine treatment", y = expression(bold("log"[10]* "Total 16S Concentration")), colour = "Change from previous visit:")
+bioburden_dotplot_chg
+```
+
+#Save graph
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y, ".png"),
+     width = 2400, height = 4500, res = 300)
+bioburden_dotplot_chg
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y, ".pdf"),
+    width = 7.73, height = 16.01)
+bioburden_dotplot_chg
+dev.off()
+```
+
+
+#Graph of water bioburden dotplot
+```{r}
+#Order factors correctly
+grouped_water_dpcr$visit_2 <- factor(grouped_water_dpcr$visit_2, levels = c("Pre-treatment (n=38)","3 Months (n=32)","12 Months (n=28)", "Post-treatment (n=31)"))
+
+y <-"bioburden_water_dotplot"
+
+#Visualization 
+
+bioburden_dotplot_water<-ggplot(grouped_water_dpcr, aes(x=visit_2, y=log_Concentration, group = Patient_id))+
+  geom_line(alpha = 0.8, size = 0.6, position=position_dodge(width=0.3), aes(colour=Change_for_segment)) + 
+  geom_point(position = position_dodge(width = 0.3), size = 5, aes(colour=visit_2))+
+  geom_point(position = position_dodge(width = 0.3), size = 5, colour="black", shape = 21)+
+    scale_x_discrete(labels =c(
+  "Pre-treatment (n=38)" = "Pre-trt\n(n=38)",  
+  "3 Months (n=32)" = " 3 Months\n(n=32)",
+  "12 Months (n=28)" = "12 Months\n(n=28)",
+  "Post-treatment (n=31)" = "Post-trt\n(n=31)"))+
+ scale_colour_manual(values=c("Pre-treatment (n=38)"="#6BE0F2","3 Months (n=32)"="#FFF86E","12 Months (n=28)"="#FCC44E","Post-treatment (n=31)"="#69F5AF","Increase" = "#052BEB", "Decrease" ="#D10A0A", "Missing previous visit"="#A8A7A7","No change"="black"), breaks =c("Increase","Decrease","Missing previous visit"), guide = guide_legend(override.aes =list(linewidth =2, size =12)))+
+  theme_classic(base_size = 20)+
+  scale_y_continuous(
+  limits = c(0.5, 4.5),
+  breaks = seq(0, 5, 1),
+  expand = expansion(mult = c(0, 0))
+)+
+  theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "bottom",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Soap and water treatment", y = expression(bold("log"[10] * " Total 16S Concentration")), colour = "Change from previous visit:")
+bioburden_dotplot_water
+```
+
+#save graph
+```{r}
+setwd(f)
+
+#Save as image
+png(filename = paste0(y, ".png"),
+    width = 2400, height = 4500, res = 300)
+bioburden_dotplot_water
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y, ".pdf"),
+    width = 7.63, height = 16.01)
+bioburden_dotplot_water
+dev.off()
+```
+
+#merge graphs
+```{r}
+y<-"bioburden_merged_dotplot"
+bioburden_merged_dotplot <-bioburden_dotplot_chg +
+  bioburden_dotplot_water + 
+  plot_layout(guides = "collect") &
+theme(legend.position = "bottom",
+    legend.margin = margin(t = 15)
+  )
+```
+
+```{r}
+setwd(f)
+#Save as image
+png(filename = paste0(y, ".png"),
+     width = 4400, height = 4500, res = 300)
+bioburden_merged_dotplot
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y, ".pdf"),
+    width = 14.66, height = 16.01)
+bioburden_merged_dotplot
+dev.off()
+```
+
+
+#Figure 1B: Alpha Diversity (Observed)
+
+#CHG alpha diversity 
+```{r}
+#Isolate treatment group
+chg_rare_ps<-ps_rare_genus
+meta_data<-as.data.frame(sample_data(ps_rare_genus))
+chg_rare_genus<-subset(meta_data, treatgroup == "1")
+
+#Add number of samples to labels
+grouped_chg<-chg_rare_genus %>% 
+  group_by(visit_2) %>% 
+  mutate(n=n()) %>% 
+  mutate(visit_2 = paste0(visit_2, " (n=",n,")"))
+
+grouped_chg$sample_id <- rownames(chg_rare_genus)
+grouped_chg <- column_to_rownames(grouped_chg, "sample_id")
+
+sample_data(chg_rare_ps) <- grouped_chg
+
+chg_rare_ps<-prune_taxa(taxa_sums(chg_rare_ps)>0,chg_rare_ps)
+chg_rare_ps
+```
+
+#water alpha diversity 
+```{r}
+#Isolate treatment group
+water_rare_ps<-ps_rare_genus
+meta_data<-as.data.frame(sample_data(ps_rare_genus))
+water_rare_genus<-subset(meta_data, treatgroup == "0")
+
+#Add number of samples to labels
+grouped_water<-water_rare_genus %>% 
+  group_by(visit_2) %>% 
+  mutate(n=n()) %>% 
+  mutate(visit_2 = paste0(visit_2, " (n=",n,")"))
+
+grouped_water$sample_id <- rownames(water_rare_genus)
+grouped_water <- column_to_rownames(grouped_water, "sample_id")
+
+sample_data(water_rare_ps) <- grouped_water
+
+water_rare_ps<-prune_taxa(taxa_sums(water_rare_ps)>0,water_rare_ps)
+
+```
+
+
+#Observed species
+
+#CHG
+```{r}
+library(ggplot2)
+library(ggstatsplot)
+library(ggpubr)
+
+#Pick_phyloseq group
+ps <-chg_rare_ps
+
+#Order factors correctly
+sample_data(ps)$visit_2 <- factor(sample_data(ps)$visit_2, levels = c("Pre-treatment (n=42)","3 Months (n=27)","12 Months (n=25)", "Post-treatment (n=28)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=42)","3 Months (n=27)"),c("Pre-treatment (n=42)","12 Months (n=25)"),c("Pre-treatment (n=42)","Post-treatment (n=28)"))
+
+#Check if adjusted p-values align with results determined later
+rich <- estimate_richness(ps, measures = "Observed")
+df <- cbind(as.data.frame(sample_data(ps)), rich)
+
+stats<-compare_means(Observed ~ visit_2,
+              data = df,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+#Title of graph 
+x <-"Alpha_Diversity_observed_change_overtime_CHG_samples"
+
+#Include n-values
+meta<-sample_data(ps)
+
+
+
+#Generate plot 
+Chg_alpha_diversity_observed<- plot_richness(ps, x="visit_2", title = NULL, measures=c("Observed"), color = "visit_2")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.16,
+  size = 3,
+  alpha = 1)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=42)" = "Pre-trt\n(n=42)",  
+  "3 Months (n=27)" = "3 Months\n(n=27)",
+  "12 Months (n=25)" = "12 Months\n(n=25)",
+  "Post-treatment (n=28)" = "Post-trt\n(n=28)"))+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+  scale_y_continuous(limits=c(0,270))+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none", 
+       strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     size = 12,
+                     label.y = c(190,220,250),
+                    comparisons = comparisons)+
+  labs(color = "Visit", x = "Chlorhexidine treatment", y = "Observed species richness")
+
+#remove defult points
+Chg_alpha_diversity_observed$layers <- Chg_alpha_diversity_observed$layers[-1]
+
+Chg_alpha_diversity_observed
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 6.67, height = 8.1) 
+Chg_alpha_diversity_observed
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width = 2000, height = 2500, res = 300)
+Chg_alpha_diversity_observed 
+dev.off()
+```
+
+#Average diversity
+```{r}
+ps<-chg_rare_ps
+rich <- estimate_richness(ps, measures = "Observed")
+interest_group <- cbind(as.data.frame(sample_data(ps)), rich)
+
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean = mean(Observed, na.rm = TRUE),
+    sd = sd(Observed, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n-1) * se,
+    ci95_high = mean + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+#Water
+```{r}
+
+#Pick_phyloseq group
+ps <-water_rare_ps
+
+#Order factors correctly
+sample_data(ps)$visit_2 <- factor(sample_data(ps)$visit_2, levels = c("Pre-treatment (n=27)","3 Months (n=24)","12 Months (n=22)", "Post-treatment (n=24)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=27)","3 Months (n=24)"),c("Pre-treatment (n=27)","12 Months (n=22)"),c("Pre-treatment (n=27)","Post-treatment (n=24)"))
+
+#Check if adjusted p-values align with results determined later
+rich <- estimate_richness(ps, measures = "Observed")
+df <- cbind(as.data.frame(sample_data(ps)), rich)
+
+stats<-compare_means(Observed ~ visit_2,
+              data = df,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+#Title of graph 
+x <-"Alpha_Diversity_observed_change_overtime_water_samples"
+
+#Include n-values
+meta<-sample_data(ps)
+
+#Generate plot 
+water_alpha_diversity_observed<- plot_richness(ps, x="visit_2", title = NULL, measures=c("Observed"), color = "visit_2")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.10,
+  size = 3,
+  alpha = 1)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+  scale_y_continuous(limits=c(0,270))+
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=27)" = "Pre-trt\n(n=27)",  
+  "3 Months (n=24)" = "3 Months\n(n=24)",
+  "12 Months (n=22)" = "12 Months\n(n=22)",
+  "Post-treatment (n=24)" = "Post-trt\n(n=24)"))+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none",
+        strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     position = "top",
+                     size = 12,
+                     label.y = c(190,220,250),
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Soap and water treatment", y = "Observed species richness")
+
+#remove defult points
+water_alpha_diversity_observed$layers <- water_alpha_diversity_observed$layers[-1]
+
+water_alpha_diversity_observed
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 6.67, height = 8.1) # Adjust dimensions as needed
+water_alpha_diversity_observed
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width = 2000, height = 2500, res = 300)
+water_alpha_diversity_observed
+dev.off()
+```
+#Average diversity
+```{r}
+ps<-water_rare_ps
+rich <- estimate_richness(ps, measures = "Observed")
+interest_group <- cbind(as.data.frame(sample_data(ps)), rich)
+
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean = mean(Observed, na.rm = TRUE),
+    sd = sd(Observed, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n-1) * se,
+    ci95_high = mean + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+
+#Merged
+```{r}
+#Title of graph 
+x <-"Alpha_Diversity_observed_change_overtime_merged_samples"
+
+Alpha_observed_merged<-Chg_alpha_diversity_observed + water_alpha_diversity_observed
+
+Alpha_observed_merged
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 14.50, height =  8.3) # Adjust dimensions as needed
+Alpha_observed_merged # Replace with your plot object
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  4200 , height = 2700, res = 300)
+Alpha_observed_merged # Replace with your actual graph object
+dev.off()
+```
+
+#Figure 1C: Alpha Diversity (Shannon)
+
+#CHG
+```{r}
+library(ggplot2)
+library(ggstatsplot)
+library(ggpubr)
+
+#Pick_phyloseq group
+ps <-chg_rare_ps
+
+#Order factors correctly
+sample_data(ps)$visit_2 <- factor(sample_data(ps)$visit_2, levels = c("Pre-treatment (n=42)","3 Months (n=27)","12 Months (n=25)", "Post-treatment (n=28)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=42)","3 Months (n=27)"),c("Pre-treatment (n=42)","12 Months (n=25)"),c("Pre-treatment (n=42)","Post-treatment (n=28)"))
+
+#Check if adjusted p-values align with results determined later
+rich <- estimate_richness(ps, measures = "Shannon")
+df <- cbind(as.data.frame(sample_data(ps)), rich)
+
+stats<-compare_means(Shannon ~ visit_2,
+              data = df,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+x <-"Alpha_Diversity_shannon_change_overtime_CHG_samples"
+
+#Include n-values
+meta<-sample_data(ps)
+
+#Generate plot 
+Chg_alpha_diversity_shannon<- plot_richness(ps, x="visit_2", title = NULL, measures=c("Shannon"), color = "visit_2")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.16,
+  size = 3,
+  alpha = 1)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+  scale_y_continuous(limits = c(0,6.5))+
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=42)" = "Pre-trt\n(n=42)",  
+  "3 Months (n=27)" = "3 Months\n(n=27)",
+  "12 Months (n=25)" = "12 Months\n(n=25)",
+  "Post-treatment (n=28)" = "Post-trt\n(n=28)"))+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none", 
+       strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     p.adjust.method = "bonferroni", 
+                     size = 12,
+                     label.y = c(4.5,5.2,5.9),
+                    comparisons = comparisons)+
+  labs(color = "Visit", x = "Chlorhexidine treatment", y = "Shannon diversity index")
+
+#remove defult points
+Chg_alpha_diversity_shannon$layers <- Chg_alpha_diversity_shannon$layers[-1]
+
+Chg_alpha_diversity_shannon
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 6.67, height = 8.1) 
+Chg_alpha_diversity_shannon
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width = 2000, height = 2500, res = 300)
+Chg_alpha_diversity_shannon
+dev.off()
+```
+#Average diversity
+```{r}
+ps<-chg_rare_ps
+rich <- estimate_richness(ps, measures = "Shannon")
+interest_group <- cbind(as.data.frame(sample_data(ps)), rich)
+
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean = mean(Shannon, na.rm = TRUE),
+    sd = sd(Shannon, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n-1) * se,
+    ci95_high = mean + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+#Water
+```{r}
+library(ggplot2)
+library(ggstatsplot)
+library(ggpubr)
+
+#Pick_phyloseq group
+ps <-water_rare_ps
+
+#Order factors correctly
+sample_data(ps)$visit_2 <- factor(sample_data(ps)$visit_2, levels = c("Pre-treatment (n=27)","3 Months (n=24)","12 Months (n=22)", "Post-treatment (n=24)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=27)","3 Months (n=24)"),c("Pre-treatment (n=27)","12 Months (n=22)"),c("Pre-treatment (n=27)","Post-treatment (n=24)"))
+
+#Check if adjusted p-values align with results determined later
+rich <- estimate_richness(ps, measures = "Shannon")
+df <- cbind(as.data.frame(sample_data(ps)), rich)
+
+stats<-compare_means(Shannon ~ visit_2,
+              data = df,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+x <-"Alpha_Diversity_shannon_change_overtime_water_samples"
+
+#Include n-values
+meta<-sample_data(ps)
+
+#Generate plot 
+water_alpha_diversity_shannon<- plot_richness(ps, x="visit_2", title = NULL, measures=c("Shannon"), color = "visit_2")+
+  geom_jitter(
+  aes(fill = visit_2),
+  shape = 21,
+  color = "black",
+  stroke = 0.3,
+  width = 0.10,
+  size = 3,
+  alpha = 1)+
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+ scale_y_continuous(limits = c(0,6.5))+
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=27)" = "Pre-trt\n(n=27)",  
+  "3 Months (n=24)" = "3 Months\n(n=24)",
+  "12 Months (n=22)" = "12 Months\n(n=22)",
+  "Post-treatment (n=24)" = "Post-trt\n(n=24)"))+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none",
+        strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     position = "top",
+                     size = 12,
+                     label.y = c(4.5,5.2,5.9),
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Soap and water treatment", y = "Shannon diversity index")
+
+#remove defult points
+water_alpha_diversity_shannon$layers <- water_alpha_diversity_shannon$layers[-1]
+
+water_alpha_diversity_shannon
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 6.67, height = 8.1) # Adjust dimensions as needed
+water_alpha_diversity_shannon
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width = 2000, height = 2500, res = 300)
+water_alpha_diversity_shannon
+dev.off()
+```
+#Average diversity
+```{r}
+ps<-water_rare_ps
+rich <- estimate_richness(ps, measures = "Shannon")
+interest_group <- cbind(as.data.frame(sample_data(ps)), rich)
+
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean = mean(Shannon, na.rm = TRUE),
+    sd = sd(Shannon, na.rm = TRUE),
+    se = sd / sqrt(n),
+    ci95_low  = mean - qt(0.975, df = n-1) * se,
+    ci95_high = mean + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+#Merged
+```{r}
+#Title of graph 
+x <-"Alpha_Diversity_shannon_change_overtime_merged_samples"
+
+Alpha_shannon_merged<-Chg_alpha_diversity_shannon+water_alpha_diversity_shannon
+
+Alpha_shannon_merged
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 14.50, height =  8.3)  # Adjust dimensions as needed
+Alpha_shannon_merged # Replace with your plot object
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  4200 , height = 2700, res = 300)
+Alpha_shannon_merged # Replace with your actual graph object
+dev.off()
+```
+
+#Merge alpha diversity plots
+```{r}
+#Alpha
+
+x <-"Alpha_Diversity_merged_samples"
+
+Alpha_observed_merged_2 <- Alpha_observed_merged + theme(plot.margin = margin(b = 30,
+                                                                              t = 30,
+                                                                              r = 30,
+                                                                              l =30))
+Alpha_shannon_merged_2 <- Alpha_shannon_merged + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 30,
+                                            r = 30)) 
+alpha_diversity_merged_plot<-Alpha_observed_merged_2/Alpha_shannon_merged_2 
+alpha_diversity_merged_plot
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 14.50, height =  8.3)  # Adjust dimensions as needed
+alpha_diversity_merged_plot # Replace with your plot object
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  4200 , height = 5400, res = 300)
+alpha_diversity_merged_plot# Replace with your actual graph object
+dev.off()
+```
+
+
+#Merge figure 2 plots
+```{r}
+
+x <-"figure_2_merged"
+alpha_diversity_merged_plot_2 <- alpha_diversity_merged_plot + theme(plot.margin = margin(b = 30,
+                                                                              t = 30,
+                                                                              r = 30,
+                                                                              l =50))
+bioburden_merged_dotplot_2 <- bioburden_merged_dotplot + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 30,
+                                            r = 50)) 
+figure_2<- (bioburden_merged_dotplot_2 | alpha_diversity_merged_plot_2) +
+  plot_layout(widths = c(1.3,1))
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+figure_2 
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+figure_2
+dev.off()
+```
+
+#Figure 2
+
+#Figure 2A:Bray-Curtis boxplot
+
+#CHG
+
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(chg_rare_ps, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds <- rel_abundance 
+
+#calculate bray-distance
+bray_dist <- distance(ps_bds, method="bray") %>%
+  as.matrix() %>%
+  as.data.frame()
+
+#Structure table into rows (FIXED: create bray_long)
+bray_long <- rownames_to_column(bray_dist, "Sample_1") %>%
+  pivot_longer(
+    -Sample_1,
+    names_to = "Sample_2",
+    values_to = "Bray_Curtis",
+    values_transform = list(Bray_Curtis = as.numeric)
+  )
+
+#format metadata
+meta <- as(sample_data(ps_bds), "data.frame") %>%
+  rownames_to_column("Sample_ID")
+
+#FIXED: use bray_long
+merged_df <- bray_long %>%
+  left_join(meta, by = c("Sample_1" = "Sample_ID"))
+
+#Identify visit 1 sample IDs
+v1_list <- merged_df %>%
+  filter(vcode_prevfootcomp == "1") %>%
+  pull(Sample_1) %>%
+  unique()
+
+#Isolate visit 1 comparisons
+vist_1 <- merged_df %>%
+  filter(Sample_2 %in% v1_list)
+
+#Remove duplicate sample pairs
+vist_1 <- vist_1 %>%
+  mutate(
+    pair_min = pmin(Sample_1, Sample_2),
+    pair_max = pmax(Sample_1, Sample_2)
+  ) %>%
+  distinct(pair_min, pair_max, .keep_all = TRUE)
+
+#Remove same-sample comparisons
+vist_1 <- vist_1 %>%
+  filter(Sample_1 != Sample_2)
+
+#Save output
+chg_v1_BC <- vist_1
+chg_v1_BC
+```
+
+
+
+#Plot figure
+```{r}
+ps <- chg_v1_BC
+
+#Order factors correctly
+ps$visit_2 <- factor(ps$visit_2, levels = c("Pre-treatment (n=42)","3 Months (n=27)","12 Months (n=25)", "Post-treatment (n=28)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=42)","3 Months (n=27)"),c("Pre-treatment (n=42)","12 Months (n=25)"),c("Pre-treatment (n=42)","Post-treatment (n=28)"))
+
+stats<-compare_means( Bray_Curtis ~ visit_2,
+              data =  chg_v1_BC,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+y<-"CHG_BC_Boxplots"
+
+BC_Boxplot_chg<-ggplot(ps, aes(x=visit_2,y=Bray_Curtis, fill= visit_2)) +
+geom_boxplot(
+  aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=42)" = "Pre-trt\n(n=42)",  
+  "3 Months (n=27)" = "3 Months\n(n=27)",
+  "12 Months (n=25)" = "12 Months\n(n=25)",
+  "Post-treatment (n=28)" = "Post-trt\n(n=28)"))+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none", 
+       strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     size = 10,
+                     comparisons = comparisons)+
+  labs(color = "Visit", x = "Chlorhexidine treatment", y = "Bray-Curtis Dissimilarity")
+
+BC_Boxplot_chg
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y,".pdf"), width = 6.67, height = 8.1) # Adjust dimensions as needed
+BC_Boxplot_chg
+dev.off()
+
+#Save as image
+png(filename = paste0(y,".png"), width = 2000, height = 2500, res = 300)
+BC_Boxplot_chg
+dev.off()
+```
+
+#Average distance
+```{r}
+interest_group<-chg_v1_BC
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_dev = mean(Bray_Curtis, na.rm = TRUE),
+    sd_dev = sd(Bray_Curtis, na.rm = TRUE),
+    se = sd_dev / sqrt(n),
+    ci95_low  = mean_dev - qt(0.975, df = n-1) * se,
+    ci95_high = mean_dev + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+#Water
+
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(water_rare_ps, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds <- rel_abundance 
+
+#calculate bray-distance
+bray_dist <- distance(ps_bds, method="bray") %>%
+  as.matrix() %>%
+  as.data.frame()
+
+#Structure table into rows (FIXED: create bray_long)
+bray_long <- rownames_to_column(bray_dist, "Sample_1") %>%
+  pivot_longer(
+    -Sample_1,
+    names_to = "Sample_2",
+    values_to = "Bray_Curtis",
+    values_transform = list(Bray_Curtis = as.numeric)
+  )
+
+#format metadata
+meta <- as(sample_data(ps_bds), "data.frame") %>%
+  rownames_to_column("Sample_ID")
+
+#FIXED: use bray_long
+merged_df <- bray_long %>%
+  left_join(meta, by = c("Sample_1" = "Sample_ID"))
+
+#Identify visit 1 sample IDs
+v1_list <- merged_df %>%
+  filter(vcode_prevfootcomp == "1") %>%
+  pull(Sample_1) %>%
+  unique()
+
+#Isolate visit 1 comparisons
+vist_1 <- merged_df %>%
+  filter(Sample_2 %in% v1_list)
+
+#Remove duplicate sample pairs
+vist_1 <- vist_1 %>%
+  mutate(
+    pair_min = pmin(Sample_1, Sample_2),
+    pair_max = pmax(Sample_1, Sample_2)
+  ) %>%
+  distinct(pair_min, pair_max, .keep_all = TRUE)
+
+#Remove same-sample comparisons
+vist_1 <- vist_1 %>%
+  filter(Sample_1 != Sample_2)
+
+#Save output
+water_v1_BC <- vist_1
+water_v1_BC
+```
+
+
+#Plot figure
+```{r}
+ps <- water_v1_BC
+
+#Order factors correctly
+ps$visit_2 <- factor(ps$visit_2, levels = c("Pre-treatment (n=27)","3 Months (n=24)","12 Months (n=22)", "Post-treatment (n=24)"))
+
+#Perform Wilcox test on:
+comparisons<-list(c("Pre-treatment (n=27)","3 Months (n=24)"),c("Pre-treatment (n=27)","12 Months (n=22)"),c("Pre-treatment (n=27)","Post-treatment (n=24)"))
+
+#Check if adjusted p-values align with results determined later
+stats<-compare_means( Bray_Curtis ~ visit_2,
+              data =  water_v1_BC,
+              method = "wilcox",
+              p.adjust.method = "holm",
+              comparisons = comparisons)
+stats
+
+#Plot
+y<-"water_BC_Boxplots"
+
+BC_Boxplot_water<-ggplot(ps, aes(x=visit_2,y=Bray_Curtis, fill= visit_2)) +
+  geom_boxplot(aes(fill = visit_2),
+  color = "black",
+  size = 0.3,       
+  alpha = 0.5,
+  outlier.shape = NA,
+)+
+labs(x ="Soap and water treatment", y = "Bray-Curtis Dissimilarity", title = "")+
+  theme_classic()+
+coord_cartesian(clip = "off") +
+  scale_x_discrete(labels =c(
+  "Pre-treatment (n=27)" = "Pre-trt\n(n=27)",  
+  "3 Months (n=24)" = "3 Months\n(n=24)",
+  "12 Months (n=22)" = "12 Months\n(n=22)",
+  "Post-treatment (n=24)" = "Post-trt\n(n=24)"))+
+  theme_classic(base_size = 20)+
+  theme_classic(base_size = 20)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+        legend.position = "none",
+        strip.text = element_blank())+
+  scale_color_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  scale_fill_manual(values=c("#6BE0F2","#FFF86E","#FCC44E","#69F5AF"))+
+  stat_compare_means(method = "wilcox",
+                     label = "p.signif",
+                     size = 10,
+                     comparisons = comparisons)
+
+BC_Boxplot_water
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y,".pdf"), width = 6.67, height = 8.1) # Adjust dimensions as needed
+BC_Boxplot_water
+dev.off()
+
+#Save as image
+png(filename = paste0(y,".png"), width = 2000, height = 2500, res = 300)
+BC_Boxplot_water 
+dev.off()
+
+```
+#Average distance
+```{r}
+interest_group<-water_v1_BC
+
+summary_stats <- interest_group %>%
+  group_by(visit_2) %>%
+  summarise(
+    n = n(),
+    mean_dev = mean(Bray_Curtis, na.rm = TRUE),
+    sd_dev = sd(Bray_Curtis, na.rm = TRUE),
+    se = sd_dev / sqrt(n),
+    ci95_low  = mean_dev - qt(0.975, df = n-1) * se,
+    ci95_high = mean_dev + qt(0.975, df = n-1) * se
+  )
+
+summary_stats
+```
+
+#Combine Graphs
+```{r}
+x<-"combined_betadiversity_boxplots"
+
+# p1 has legend removed
+p1 <- BC_Boxplot_chg + 
+  theme(legend.position = "none") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- BC_Boxplot_water + 
+   theme(legend.position = "none",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_betadiversity_boxplots <- p1 / p2 
+
+combined_betadiversity_boxplots
+
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.7) 
+combined_betadiversity_boxplots
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5700, res = 300)
+combined_betadiversity_boxplots
+dev.off()
+
+```
+
+
+#Figure 3B:Change during treatment
+
+#CHG
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(chg_rare_ps, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds<-rel_abundance 
+ps_bds
+
+#set testing parameter
+x="treatment_active"
+
+#Import tree
+phy_tree(ps_bds)<-qza_to_phyloseq(tree="/Users/michellebode/maryland/16S/processed_data/tree/rooted_tree.qza")
+ps_bds
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ treatment_active, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_active_treat_chg<-ps_bds
+```
+
+#Graph
+```{r}
+y<-"Bray_Curtis_Active_vs_No_Treatetment_chg"
+
+# Run NMDS 
+ordination_result <- ordinate(bray_active_treat_chg, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_active_treat_chg_plot<-plot_ordination(bray_active_treat_chg, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#F54E4E","#8953CF"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+  scale_color_manual(
+  values = c(
+    "Active treatment (3 months + 12 months)" = "#F54E4E",
+    "No active treatment (pre-trt + post-trt" = "#8953CF"
+  ),
+  labels = c(
+    "Active treatment (3 months + 12 months)" = "Active trt (3 & 12 months)",
+    "No active treatment (pre-trt + post-trt" = "No active trt (pre & post-trt)"
+  )
+)+
+  labs( title = "", color = "" )
+
+bray_active_treat_chg_plot
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_active_treat_chg_plot
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_active_treat_chg_plot
+dev.off()
+```
+
+
+#Water
+
+#Prepare data
+```{r}
+#Ps object with exact counts
+ps_bds<-water_rare_ps
+
+#created grouped treatement
+meta<-sample_data(ps_bds)
+meta$current_treat <- ifelse(meta$vcode_prevfootcomp %in% c("1","7"),"No Active treatment","Active Treatment")
+sample_data(ps_bds) <- meta
+
+#set testing parameter
+x="treatment_active"
+
+#Import tree
+phy_tree(ps_bds)<-qza_to_phyloseq(tree="/Users/michellebode/maryland/16S/processed_data/tree/rooted_tree.qza")
+ps_bds
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+
+print("permanova")
+permanova_result <- vegan::adonis2(bray_dist ~ treatment_active, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+bray_active_treat_water<-ps_bds
+```
+
+
+#Graph
+```{r}
+y<-"Bray_Curtis_Active_vs_No_Treatetment_water"
+
+# Run NMDS 
+ordination_result <- ordinate(bray_active_treat_water, method='NMDS', distance='bray', k=4)
+
+#Check stress levels if >0.2 increase k. ideally <0.1
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+bray_active_treat_water_plot<-plot_ordination(bray_active_treat_water, ordination_result, axes=c(1,2), color=x)+
+geom_point(size = 6) +
+  geom_point(
+    size = 6,
+    shape = 21,        
+    color = "black",   
+    stroke = 0.3) +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#F54E4E","#8953CF"), 
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+))) +
+  theme_classic()+
+  theme_bw()+
+     theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.title =element_text(size=26),
+       legend.position = "bottom") +
+scale_color_manual(
+  values = c(
+    "Active treatment (3 months + 12 months)" = "#F54E4E",
+    "No active treatment (pre-trt + post-trt" = "#8953CF"
+  ),
+  labels = c(
+    "Active treatment (3 months + 12 months)" = "Active trt (3 & 12 months)",
+    "No active treatment (pre-trt + post-trt" = "No active trt (pre & post-trt)"
+  )
+)+
+  labs( title = "", color = "" )
+
+bray_active_treat_water_plot
+```
+
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 8) # Adjust dimensions as needed
+bray_active_treat_water_plot
+dev.off()
+
+#Save plot as pdf
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 2000, res = 300)
+bray_active_treat_water_plot
+dev.off()
+```
+
+#Combine Graphs
+```{r}
+
+x<-"combined_treatment_active"
+
+p1 <- bray_active_treat_chg_plot + 
+  theme(legend.position = "none")+
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.margin = margin(b = 30))
+
+p2 <- bray_active_treat_water_plot + 
+  theme( legend.position = "bottom", legend.margin = margin(t = 15), plot.margin = margin(t = 30)) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))+
+     labs(title = "Soap and water treatment")
+
+combined_active_treatment <- p1 / p2 
+
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_active_treatment
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_active_treatment
+dev.off()
+```
+
+
+#Figure 3C: Shift from visit 1 to visit 6
+
+#isolate treatment groups
+```{r}
+v1v6<-subset_samples(ps_rare_genus, vcode_prevfootcomp %in% c("1","6"))
+ps_rare_water<-subset_samples(v1v6, treatgroup == "0")
+ps_rare_chg<-subset_samples(v1v6, treatgroup == "1")
+
+# Keep only Patient_id that have both visit 1 and 6
+meta_c<-as.data.frame(sample_data(ps_rare_chg))
+valid_patients_chg <- meta_c %>%
+  group_by(Patient_id) %>%
+  filter(all(c("1", "6") %in% vcode_prevfootcomp)) %>%   # visit is probably character, so use "1","6"
+  pull(Patient_id) %>%                      # <- extract as vector
+  unique()
+
+ps_rare_chg <- prune_samples(sample_names(ps_rare_chg)[sample_data(ps_rare_chg)$Patient_id %in% valid_patients_chg],ps_rare_chg)
+
+meta_w<-as.data.frame(sample_data(ps_rare_water))
+valid_patients_water <- meta_w %>%
+  group_by(Patient_id) %>%
+  filter(all(c("1", "6") %in% vcode_prevfootcomp)) %>%   # visit is probably character, so use "1","6"
+  pull(Patient_id) %>%                      # <- extract as vector
+  unique()
+
+ps_rare_water <- prune_samples(sample_names(ps_rare_water)[sample_data(ps_rare_water)$Patient_id %in% valid_patients_water],ps_rare_water)
+
+ps_rare_chg
+ps_rare_water
+
+#determine number of patients
+length(unique(sample_data(ps_rare_chg)$Patient_id))
+length(unique(sample_data(ps_rare_water)$Patient_id))
+```
+
+
+
+#CHG
+
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(ps_rare_chg, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds<-rel_abundance 
+
+#Ps object with exact counts
+#ps_bds<-unique_genus
+
+#set testing parameter
+x="vcode_prevfootcomp"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+print("permanova")
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+bray_dist <- distance(ps_bds, method = "bray")
+permanova_result <- vegan::adonis2(bray_dist ~ vcode_prevfootcomp, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+
+```
+
+#Graphing differences
+```{r}
+y <- "Bray_Curtis_NMDS_Chg_1v6"
+
+#order
+meta <-as.data.frame(sample_data(ps_bds))
+meta$visit <- factor(meta$visit, levels = c("1", "6"), ordered = TRUE)
+sample_data(ps_bds) <- meta
+
+# Run NMDS 
+ordination_result <- ordinate(ps_bds, method = 'NMDS', distance = 'bray', k = 4)
+
+# Check stress
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+Bray_Curtis_NMDS_Chg_1v6<- plot_ordination(ps_bds, ordination_result, axes = c(1,2), color = "visit_2") +
+  geom_point(size =6, 
+             alpha =1)+
+  geom_point(
+    size = 6,
+    alpha = 1,
+    shape = 21,
+    stroke = 0.3,
+    color ="black") +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FCC44E"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+  )))+
+  geom_path(
+    aes(group = Patient_id),
+    data = function(df) df[order(df$Patient_id, df$visit_2), ],
+    arrow = arrow(type = "closed", length = unit(0.2, "inches")),
+    linewidth = 0.4,
+    color = "black",
+    alpha = 0.9
+  ) +
+ theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+       legend.position = "none",
+        legend.text =element_text(size=26,face ="italic"),
+       legend.title = element_text(size=26))+
+  labs(title = "", color = "")+
+  scale_color_manual(values = c("Pre-treatment"="#6BE0F2", "12 Months"="#FCC44E"))
+
+
+Bray_Curtis_NMDS_Chg_1v6
+```
+
+#print graphs
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 6) # Adjust dimensions as needed
+Bray_Curtis_NMDS_Chg_1v6 # Replace with your plot object
+dev.off()
+
+#Save plot as pdf
+setwd(f)
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 1500, res = 300)
+Bray_Curtis_NMDS_Chg_1v6  # Replace with your actual graph object
+dev.off()
+```
+
+
+#Water
+
+#Prepare data
+```{r}
+#transform to relative abundance 
+rel_abundance = transform_sample_counts(ps_rare_water, function(x) x*100/ sum(x))
+
+#Ps object with relative abundance
+ps_bds<-rel_abundance 
+
+#Ps object with exact counts
+#ps_bds<-unique_genus
+
+#set testing parameter
+x="vcode_prevfootcomp"
+
+#statistically test for the observed (or unobserved) difference between the groups using permanova. 
+#But before running permanova, test and make sure that the assumption of homogenity of dispersion is met as this can affect your permanova results.
+#If the assumption is not met (ie the dispersion test is significant), you can still do permanova but have in mind that if it is significant, the differences might be due to unequal dispersion between the groups and not their centroids (average microbial community composition)
+
+meta <- as(sample_data(ps_bds), "data.frame")
+meta_clean <- meta[!is.na(meta[[x]]), ] 
+sample_data(ps_bds)<-meta_clean
+
+#check dispersion assumption, if pval is non-significant it means that the assumption of homogenity of dispersion holds and we can proceed with permanova
+
+bray_dist <- distance(ps_bds, method = "bray")
+dispersion_result <- vegan::betadisper(bray_dist, sample_data(ps_bds)[[x]]) 
+
+print("anova")
+anova(dispersion_result)
+
+print("TurkeyHSD")
+TukeyHSD(dispersion_result)
+
+#PERMDISP - confirms dispersion assumption. Basically performs permutataion tests on the dispesion results from betadisper, should be non-significant too to meet the assumption.
+
+print("PERMDISP" )
+vegan::permutest(dispersion_result, permutations = 999)
+
+print("permanova")
+#In permanova result, pay attention to the p-value and Rsquare value (effect size). If the effect size is very small, this could be the reason why the difference is not visible in the PCOA plot
+bray_dist <- distance(ps_bds, method = "bray")
+permanova_result <- vegan::adonis2(bray_dist ~ vcode_prevfootcomp, data = as(sample_data(ps_bds), "data.frame"))
+print(permanova_result)
+```
+
+#Graphing differences
+```{r}
+y <- "Bray_Curtis_NMDS_water_1v6"
+
+#order
+meta <-as.data.frame(sample_data(ps_bds))
+meta$visit <- factor(meta$visit, levels = c("1", "6"), ordered = TRUE)
+sample_data(ps_bds) <- meta
+
+# Run NMDS 
+ordination_result <- ordinate(ps_bds, method = 'NMDS', distance = 'bray', k = 4)
+
+# Check stress
+ordination_result$stress
+
+# Plot Axis 1 and Axis 2
+Bray_Curtis_NMDS_water_1v6<- plot_ordination(ps_bds, ordination_result, axes = c(1,2), color = "visit_2") +
+  geom_point(size =6, 
+             alpha =1)+
+  geom_point(
+    size = 6,
+    alpha = 1,
+    shape = 21,
+    stroke = 0.3,
+    color ="black") +
+  guides(color = guide_legend(
+  override.aes = list(
+    shape = 21,
+    fill = c("#6BE0F2","#FCC44E"), # match your fill colors
+    color = "black",  # dark border
+    stroke = 0.4,
+    size = 6
+  )))+
+  geom_path(
+    aes(group = Patient_id),
+    data = function(df) df[order(df$Patient_id, df$visit_2), ],
+    arrow = arrow(type = "closed", length = unit(0.2, "inches")),
+    linewidth = 0.4,
+    color = "black",
+    alpha = 0.9
+  ) +
+ theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+       legend.position = "none",
+       legend.title = element_text(size=26),
+        legend.text =element_text(size=26,face ="italic"))+
+  labs(title = "", color = "")+
+  scale_color_manual(values = c("Pre-treatment"="#6BE0F2", "12 Months"="#FCC44E"))
+
+
+Bray_Curtis_NMDS_water_1v6
+```
+
+#print graphs
+```{r}
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y, "_axis_1_and_2.pdf"), width = 10, height = 6) 
+Bray_Curtis_NMDS_water_1v6
+dev.off()
+
+#Save plot as pdf
+setwd(f)
+png(filename = paste0(y, "_axis_1_and_2.png"), width = 2500, height = 1500, res = 300)
+Bray_Curtis_NMDS_water_1v6
+dev.off()
+```
+
+#Combine Graphs
+```{r}
+x<-"combined_v1_v6"
+
+# p1 has legend removed
+p1 <- Bray_Curtis_NMDS_Chg_1v6 + 
+  theme(legend.position = "none") + 
+  labs(title = "Chlorhexidine treatment") + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.margin = margin(b = 30))
+
+# p2 keeps legend
+p2 <- Bray_Curtis_NMDS_water_1v6 + 
+   theme(legend.position = "bottom",legend.margin = margin(t = 15), plot.margin = margin(t = 30)
+  )+
+  labs(title = "Soap and water treatment") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+
+combined_v1_v6 <- p1 / p2 
+
+combined_v1_v6
+
+```
+
+```{r}
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 10.333, height =  7.5) 
+combined_v1_v6
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  3000 , height = 5400, res = 300)
+combined_v1_v6
+dev.off()
+```
+
+
+#Merge figure 3 plots
+```{r}
+x <-"figure_3_merged"
+
+
+combined_betadiversity_boxplots_2 <- combined_betadiversity_boxplots + theme(plot.margin = margin(b = 0,
+                                                                              t = 50,
+                                                                              r = 30,
+                                                                              l =50))
+
+
+combined_active_treatment_2 <- combined_active_treatment + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 50,
+                                            r = 50)) 
+
+combined_v1_v6_2 <- combined_v1_v6 + theme(plot.margin = margin(b = 30,
+                                            t = 30,
+                                            l = 50,
+                                            r = 50)) 
+
+figure_3 <- (
+  combined_betadiversity_boxplots_2 | 
+  combined_active_treatment |
+  combined_v1_v6_2 
+) + 
+  plot_layout(widths = c(1,1.18,1))
+
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+figure_3 
+dev.off()
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+figure_3 
+dev.off()
+```
+
+
+
+
+
+#Figure 4
+
+#Figure 4A: Relative abundance graphs  
+
+#Prepare data
+```{r}
+#Filter out low features (joined)
+ps_rare_water<-subset_samples(ps_nr_genus, treatgroup == "0")
+ps_rare_chg<-subset_samples(ps_nr_genus, treatgroup == "1")
+
+cleaned_otu_chg_1<-otu_table(ps_rare_chg)
+cleaned_otu_water_1<-otu_table(ps_rare_water)
+
+#remove features with few counts in Chg
+cleaned_otu_chg<- cleaned_otu_chg_1[rowSums(cleaned_otu_chg_1) > 20,]
+
+print("Chg features lost")
+lost_h=nrow(otu_table(cleaned_otu_chg_1))-nrow(cleaned_otu_chg)
+lost_h
+lost_h/nrow(cleaned_otu_chg_1)*100
+
+#remove features with few counts in water
+cleaned_otu_water<-cleaned_otu_water_1[rowSums(cleaned_otu_water_1) > 20,]
+
+print("water features lost")
+lost_h=(nrow(cleaned_otu_water_1)-nrow(cleaned_otu_water))
+lost_h
+lost_h/nrow(cleaned_otu_water_1)*100
+
+#Check stats 
+print("chg samples count distribution")
+summary(rowSums(cleaned_otu_chg))
+print("water samples count distribution")
+summary(rowSums(cleaned_otu_water))
+
+#update phyloseq object 
+clean_chg_ps<-ps_rare_chg
+clean_water_ps<-ps_rare_water
+otu_table(clean_chg_ps)<-cleaned_otu_chg
+otu_table(clean_water_ps)<-cleaned_otu_water
+
+#Transform counts
+# Transform counts to relative abundances (chg)
+ps_rel_abundance_c = transform_sample_counts(clean_chg_ps, function(x) x*100 / sum(x))
+# Transform counts to relative abundances (water)
+ps_rel_abundance_w = transform_sample_counts(clean_water_ps, function(x) x*100 / sum(x))
+
+#Merge ps into df
+ps_tab_genus_df_c = psmelt(ps_rel_abundance_c)
+ps_tab_genus_df_w = psmelt(ps_rel_abundance_w)
+
+
+#Identify top abundant
+
+# Summarize total abundance for each genus
+top_genera_c <- ps_tab_genus_df_c %>%
+  group_by(Genus) %>%
+  summarize(TotalAbundance = sum(Abundance, na.rm = TRUE)) %>%
+  arrange(desc(TotalAbundance)) %>%
+  slice_head(n = 15)  # Select the top 15 genera
+
+top_genus_names_c<-top_genera_c$Genus
+
+#order highest to lowest
+top_genera_c <- top_genera_c %>%
+  mutate(Genus = factor(Genus, levels = Genus))
+
+#plot overall most abundant
+healthy_plot<-ggplot(top_genera_c, aes(x=Genus, y=TotalAbundance))+
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels
+  labs(title="Top 15 abundant genus in chg samples", x = "Genus", y = "Added relative abundances")
+healthy_plot
+
+# Summarize total abundance for each genus
+top_genera_w <- ps_tab_genus_df_w %>%
+  group_by(Genus) %>%
+  summarize(TotalAbundance = sum(Abundance, na.rm = TRUE)) %>%
+  arrange(desc(TotalAbundance)) %>%
+  slice_head(n = 15)  # Select the top 10 genera
+
+top_genus_names_w<-top_genera_w$Genus
+
+#order highest to lowest
+top_genera_w <- top_genera_w %>%
+  mutate(Genus = factor(Genus, levels = Genus))
+
+#plot overall most abundant
+wound_plot<-ggplot(top_genera_w, aes(x=Genus, y=TotalAbundance))+
+  geom_bar(stat="identity") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels
+  labs(title="Top 15 abundant genus in water samples", x = "Genus", y = "Added relative abundances")
+wound_plot
+```
+
+
+
+#Prepare for figures
+```{r}
+#Water
+
+# Convert Genus to character (if it's a factor)
+ps_tab_genus_df_w$Genus <- as.character(ps_tab_genus_df_w$Genus)
+
+
+# Rename genera not in the list to "Other"
+ps_tab_genus_df_w$Genus[!ps_tab_genus_df_w$Genus %in% top_genus_names_w] <- "A_Other"
+
+# Check the unique genera and their count
+unique(ps_tab_genus_df_w$Genus)
+length(unique(ps_tab_genus_df_w$Genus))
+
+#Chg
+
+# Convert Genus to character (if it's a factor)
+ps_tab_genus_df_c$Genus <- as.character(ps_tab_genus_df_c$Genus)
+
+# Rename genera not in the list to "Other"
+ps_tab_genus_df_c$Genus[!ps_tab_genus_df_c$Genus %in% top_genus_names_c] <- "A_Other"
+
+#rename shorthand of genera
+ps_tab_genus_df_c$Genus <- forcats::fct_recode(
+  ps_tab_genus_df_c$Genus,
+  "Methylobacterium" = "Methylobacterium-Methylorubrum"
+)
+
+# Check the unique genera and their count
+unique(ps_tab_genus_df_c$Genus)
+length(unique(ps_tab_genus_df_c$Genus))
+
+
+#Relative Abundance plots
+
+library(dplyr)
+
+# Merge sequentially with base R
+colour_df <- vctrs::vec_c(ps_tab_genus_df_w,ps_tab_genus_df_c)
+
+# Summarize by Genus
+colour_complete_df <- colour_df %>% group_by(Genus)
+length(unique(colour_complete_df$Genus))
+
+
+#Colour
+
+# Load necessary libraries
+library(RColorBrewer)
+
+# Ensure orderus is a factor
+colour_complete_df$Genus <- as.factor(colour_complete_df$Genus)
+
+
+# Define a custom color palette
+custom_colors <- c( "#D9D9D9",
+ #pinks
+  "#D81B60", "#EC407A","#F06292", "#F48FB1",
+  #"#F8BBD0",
+ 
+   # Oranges and Yellows
+  "#FF6E40","#FF9800","#FFC107","#FFEB3B",
+  #"#FFF59D",
+
+  
+  # Greens
+  #"#1B5E20", 
+  "#2E7D32","#4CAF50", "#AED581", "#C8E6C9", 
+  
+
+  # Blues and Teals
+  "#01579B","#1976D2", "#2196F3", "#64B5F6",
+  #"#BBDEFB", 
+  
+ 
+  # Purples and Violets
+  "#673AB7","#B39DDB","#E6DBF2")
+
+  
+  
+# Create a named vector for the custom colors
+names(custom_colors) <- levels(colour_complete_df$Genus)
+
+# Get the number of distinct levels (orderus)
+num_levels <- length(levels(colour_complete_df$Genus))
+
+# Use only as many colors as you have levels
+rel_ps_genus_colors <- custom_colors[1:num_levels]
+
+rel_ps_genus_colors
+```
+
+
+#Chg
+```{r}
+ordered_samples <- ps_tab_genus_df_c%>%
+  filter(Genus == "Staphylococcus") %>%
+  arrange(desc(Abundance)) %>%
+  pull(Sample)
+
+ps_tab_genus_df_c$Sample <- factor(ps_tab_genus_df_c$Sample,
+                                     levels = c(ordered_samples,
+                                                setdiff(unique(ps_tab_genus_df_c$Sample),
+                                                        ordered_samples)))
+
+y<-"Chg_Samples_Relative_Abundance_Plot_Top_Genus_all_outcome"
+
+#Create Plot all samples
+Chg_genus_plot <-ggplot(ps_tab_genus_df_c, aes(x=Sample, y=Abundance, fill = Genus)) +
+  geom_bar(stat="identity", aes(fill=Genus))+
+  labs(x="Chlorhexidine treatment", y="% Relative Abundance", title="", fill ="Top 15 Genera")+
+  facet_grid(~visit_2, space="free", scales="free_x", labeller = labeller(
+             visit_2 = c(
+  "Pre-treatment" = "Pre-trt\n(n=42)",  
+  "3 Months" = "3 Months\n(n=27)",
+  "12 Months" = "12 Months\n(n=25)",
+  "Post-treatment" = "Post-trt\n(n=28)")))+
+theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26,face = "bold"),
+        axis.title.x.bottom = element_text(size=26,face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.position = "right",
+        legend.text =element_text(size=20,face ="italic"),
+       legend.title =element_text(size=24))+
+  theme(strip.background=element_blank(),
+        axis.text.x.bottom = element_blank())+
+  scale_fill_manual(values=rel_ps_genus_colors)
+Chg_genus_plot
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y,".pdf"), width = 15, height = 8) # Adjust dimensions as needed
+Chg_genus_plot # Replace with your plot object
+dev.off()
+
+#Save as image
+setwd(f)
+png(filename = paste0(y,".png"), width = 4000, height = 1750, res = 300)
+Chg_genus_plot # Replace with your actual graph object
+dev.off()
+```
+
+#Water
+```{r}
+ordered_samples <- ps_tab_genus_df_w %>%
+  filter(Genus == "Staphylococcus") %>%
+  arrange(desc(Abundance)) %>%
+  pull(Sample)
+
+ps_tab_genus_df_w$Sample <- factor(ps_tab_genus_df_w$Sample,
+                                     levels = c(ordered_samples,
+                                                setdiff(unique(ps_tab_genus_df_w$Sample),
+                                                        ordered_samples)))
+
+y<-"Water_Samples_Relative_Abundance_Plot_Top_Genus_all_outcome"
+
+#Create Plot all samples
+Water_genus_plot <-ggplot(ps_tab_genus_df_w, aes(x=Sample, y=Abundance, fill = Genus)) +
+  geom_bar(stat="identity", aes(fill=Genus))+
+  labs(x="Soap and water treatment", y="% Relative Abundance", title="", fill ="Top 15 Genera")+
+  facet_grid(~visit_2, space="free", scales="free_x", labeller = labeller(
+             visit_2 = c(
+  "Pre-treatment" = "Pre-trt\n(n=27)",  
+  "3 Months" = "3 Months\n(n=24)",
+  "12 Months" = "12 Months\n(n=22)",
+  "Post-treatment" = "Post-trt\n(n=24)")))+
+theme_classic(base_size = 26)+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26,face = "bold"),
+        axis.title.x.bottom = element_text(size=26, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.position = "right",
+        legend.text =element_text(size=20,face ="italic"),
+       legend.title =element_text(size=24))+
+  theme(strip.background=element_blank(),
+        axis.text.x.bottom = element_blank())+
+  scale_fill_manual(values=rel_ps_genus_colors)
+Water_genus_plot
+
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(y,".pdf"), width = 15, height = 8) # Adjust dimensions as needed
+Water_genus_plot # Replace with your plot object
+dev.off()
+
+#Save as image
+setwd(f)
+png(filename = paste0(y,".png"), width = 4000, height = 1750, res = 300)
+Water_genus_plot # Replace with your actual graph object
+dev.off()
+```
+
+#merged relative abundance plots
+```{r}
+#Combine Graphs
+
+x<-"combined_relative_abundance"
+
+# p1 has legend removed
+p1 <-  Chg_genus_plot +  
+  theme(plot.margin = margin(b =1 ,t=1))
+
+# p2 keeps legend
+p2 <- Water_genus_plot + 
+   theme(plot.margin = margin(t =1, b=1),  
+
+    # Align legend by the boxes, not the text
+    legend.text.align = 0,      # left-align text AFTER the box
+    legend.justification = "left",
+    legend.box.just = "left"
+  )
+
+combined_relative_abundance <- p1 / p2 
+combined_relative_abundance
+
+#Save plot as pdf
+
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 15, height = 8) 
+combined_relative_abundance
+dev.off()
+
+png(filename = paste0(x,".png"), width = 4000, height = 3500, res = 300)
+combined_relative_abundance
+dev.off()
+```
+
+
+#Figure 4B: Staphyloccus relative abundance
+
+#Prepare data
+```{r}
+#Isolate Staphylococcus
+ps_staph_water<-subset(ps_tab_genus_df_w, Genus=="Staphylococcus") 
+ps_staph_chg<-subset(ps_tab_genus_df_c, Genus=="Staphylococcus") 
+
+#Record change in concentration from prior visit
+df_staph_water <- ps_staph_water %>%
+  group_by(Patient_id) %>%
+  arrange(Patient_id, vcode_prevfootcomp) %>%
+  mutate(
+    prev_code  = lag(vcode_prevfootcomp),
+    prev_value = lag(Abundance),
+    has_1 = any(vcode_prevfootcomp == 1),
+    is_consecutive = case_when(
+      vcode_prevfootcomp == 1 ~ NA,
+      vcode_prevfootcomp == 3 & has_1 ~ TRUE,
+      vcode_prevfootcomp == 3 & !has_1 ~ FALSE,
+      vcode_prevfootcomp == 6 & prev_code == 3 ~ TRUE,
+      vcode_prevfootcomp == 6 & prev_code == 1 ~ FALSE,
+      vcode_prevfootcomp == 6 & is.na(prev_code) ~ FALSE,
+      vcode_prevfootcomp == 7 & prev_code == 6 ~ TRUE,
+      vcode_prevfootcomp == 7 & prev_code %in% c(1,3) ~ FALSE,
+      vcode_prevfootcomp == 7 & is.na(prev_code) ~ FALSE,
+      TRUE ~ NA
+    ),
+    Patient_change = case_when(
+      is_consecutive == TRUE & Abundance > prev_value ~ "Increase",
+      is_consecutive == TRUE & Abundance < prev_value ~ "Decrease",
+      is_consecutive == TRUE & Abundance == prev_value ~ "No change",
+      is_consecutive == FALSE ~ "Missing previous visit",
+      TRUE ~ NA_character_        
+    ),
+    Change_for_segment = lead(Patient_change),
+    change_amount = Abundance - prev_value
+  ) %>%
+  ungroup()
+
+
+df_staph_chg <- ps_staph_chg %>%
+  group_by(Patient_id) %>%
+  arrange(Patient_id, vcode_prevfootcomp) %>%
+  mutate(
+    prev_code  = lag(vcode_prevfootcomp),
+    prev_value = lag(Abundance),
+    has_1 = any(vcode_prevfootcomp == 1),
+    is_consecutive = case_when(
+      vcode_prevfootcomp == 1 ~ NA,
+      vcode_prevfootcomp == 3 & has_1 ~ TRUE,
+      vcode_prevfootcomp == 3 & !has_1 ~ FALSE,
+      vcode_prevfootcomp == 6 & prev_code == 3 ~ TRUE,
+      vcode_prevfootcomp == 6 & prev_code == 1 ~ FALSE,
+      vcode_prevfootcomp == 6 & is.na(prev_code) ~ FALSE,
+      vcode_prevfootcomp == 7 & prev_code == 6 ~ TRUE,
+      vcode_prevfootcomp == 7 & prev_code %in% c(1,3) ~ FALSE,
+      vcode_prevfootcomp == 7 & is.na(prev_code) ~ FALSE,
+      TRUE ~ NA
+    ),
+    Patient_change = case_when(
+      is_consecutive == TRUE & Abundance > prev_value ~ "Increase",
+      is_consecutive == TRUE & Abundance < prev_value ~ "Decrease",
+      is_consecutive == TRUE & Abundance == prev_value ~ "No change",
+      is_consecutive == FALSE ~ "Missing previous visit",
+      TRUE ~ NA_character_        
+    ),
+    Change_for_segment = lead(Patient_change),
+    change_amount = Abundance - prev_value
+  ) %>%
+  ungroup()
+```
+
+
+#Graph of CHG staph
+```{r}
+#Order factors correctly
+df_staph_chg$visit_2 <- factor(df_staph_chg$visit_2, levels = c("Pre-treatment","3 Months","12 Months","Post-treatment"))
+
+y <-"staph_chg_dotplot"
+
+#Visualization 
+
+library(ggplot2)
+
+staph_dotplot_chg<-ggplot(df_staph_chg, aes(x=visit_2, y=Abundance, group = Patient_id))+
+  scale_fill_manual(values=c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E","12 Months"="#FCC44E","Post-treatment"="#69F5AF"))+
+  geom_line(alpha = 0.8, size = 0.6, position=position_dodge(width=0.3), aes(colour=Change_for_segment)) + 
+  scale_colour_manual(values=c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E","12 Months"="#FCC44E","Post-treatment"="#69F5AF","Increase" = "#052BEB", "Decrease" ="#D10A0A", "Missing previous visit"="#A8A7A7","No change"="black"), breaks =c("Increase","Decrease","Missing previous visit"), guide = guide_legend(override.aes =list(linewidth =2, size = 12)))+
+  geom_point(position = position_dodge(width = 0.3), size = 5, aes(colour=visit_2))+
+  scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=42)",  
+  "3 Months" = "3 Months\n(n=27)",
+  "12 Months" = "12 Months\n(n=25)",
+  "Post-treatment" = "Post-trt\n(n=28)"))+
+  geom_point(position = position_dodge(width = 0.3), size = 5, colour="black", shape = 21)+
+  theme_classic(base_size = 26)+
+  scale_y_continuous(limits =c(0,100))+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "bottom",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Chlorhexidine treatment", y = "Relative abundance of Staphylococcus %", colour = "Change from previous visit:")
+staph_dotplot_chg
+
+setwd(f)
+
+#Save as image
+png(filename = paste0(y, ".png"),
+     width = 2400, height = 4500, res = 300)
+staph_dotplot_chg
+dev.off()
+
+#Save plot as pdf
+pdf(file = paste0(y, ".pdf"),
+    width = 7.73, height = 16.01)
+staph_dotplot_chg
+dev.off()
+```
+
+
+```{r}
+#Order factors correctly
+df_staph_water$visit_2 <- factor(df_staph_water$visit_2, levels = c("Pre-treatment","3 Months","12 Months", "Post-treatment"))
+
+y <-"staph_water_dotplot"
+
+#Visualization 
+
+library(ggplot2)
+
+staph_dotplot_water<-ggplot(df_staph_water, aes(x=visit_2, y=Abundance, group = Patient_id))+
+   scale_fill_manual(values=c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E","12 Months"="#FCC44E","Post-treatment"="#69F5AF"))+
+  geom_line(alpha = 0.8, size = 0.6, position=position_dodge(width=0.3), aes(colour=Change_for_segment)) + 
+  scale_colour_manual(values=c("Pre-treatment"="#6BE0F2","3 Months"="#FFF86E","12 Months"="#FCC44E","Post-treatment"="#69F5AF","Increase" = "#052BEB", "Decrease" ="#D10A0A", "Missing previous visit"="#A8A7A7","No change"="black"), breaks =c("Increase","Decrease","Missing previous visit"), guide = guide_legend(override.aes =list(linewidth =2, size = 12)))+
+  geom_point(position = position_dodge(width = 0.3), size = 5, aes(colour=visit_2))+
+     scale_x_discrete(labels =c(
+  "Pre-treatment" = "Pre-trt\n(n=27)",  
+  "3 Months" = "3 Months\n(n=24)",
+  "12 Months" = "12 Months\n(n=22)",
+  "Post-treatment" = "Post-trt\n(n=24)"))+
+  geom_point(position = position_dodge(width = 0.3), size = 5, colour="black", shape = 21)+
+  theme_classic(base_size = 26)+
+  scale_y_continuous(limits =c(0,100))+
+ theme(strip.background = element_blank(), 
+        axis.text.y = element_text(size=20),
+        axis.title.y = element_text(size=26, vjust=2, face = "bold"),
+        axis.title.x.bottom = element_text(size=26,vjust=-1, face = "bold"),
+        axis.text.x.bottom = element_text(angle = 0,size = 20),
+        legend.text =element_text(size=26,face ="italic"),
+        legend.position = "bottom",
+        legend.title =element_text(size=26))+
+labs(title = "", x = "Soap and water treatment", y = "Relative abundance of Staphylococcus %", colour = "Change from previous visit:")
+staph_dotplot_water
+
+setwd(f)
+
+#Save as image
+png(filename = paste0(y, ".png"),
+    width = 2400, height = 4500, res = 300)
+staph_dotplot_water
+dev.off()
+
+pdf(file = paste0(y, ".pdf"),
+    width = 7.63, height = 16.01)
+staph_dotplot_water
+dev.off()
+```
+
+#merge graphs
+```{r}
+y<-"staph_merged_dotplot"
+staph_merged_dotplot <-staph_dotplot_chg +
+  staph_dotplot_water +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom",
+    legend.margin = margin(t = 15)
+  )
+
+setwd(f)
+
+#Save as image
+png(filename = paste0(y, ".png"),
+     width = 4400, height = 4500, res = 300)
+staph_merged_dotplot
+dev.off()
+
+setwd(f)
+#Save plot as pdf
+pdf(file = paste0(y, ".pdf"),
+    width = 14.66, height = 16.01)
+staph_merged_dotplot
+dev.off()
+```
+
+#Water stats
+```{r}
+meta_data<-df_staph_water
+
+
+#3 months
+Months_3<-subset(meta_data, vcode_prevfootcomp == "3")
+
+print(" 3 month total")
+t<-nrow(Months_3)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_3, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+
+print("Increase")
+inc<-subset(Months_3, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_3, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#12 months
+Months_12<-subset(meta_data, vcode_prevfootcomp == "6")
+
+print("12 month total")
+t<-nrow(Months_12)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_12, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(Months_12, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_12, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#Post
+post<-subset(meta_data, vcode_prevfootcomp == "7")
+
+print("post total")
+t<-nrow(post)
+t
+
+print("Missing previous visit")
+nc<-subset(post, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(post, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(post, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+```
+
+#Chg stats
+```{r}
+meta_data<-df_staph_chg
+
+#3 months
+Months_3<-subset(meta_data, vcode_prevfootcomp == "3")
+
+print(" 3 month total")
+t<-nrow(Months_3)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_3, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(Months_3, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_3, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#12 months
+Months_12<-subset(meta_data, vcode_prevfootcomp == "6")
+
+print("12 month total")
+t<-nrow(Months_12)
+t
+
+print("Missing previous visit")
+nc<-subset(Months_12, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(Months_12, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(Months_12, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+#Post
+post<-subset(meta_data, vcode_prevfootcomp == "7")
+
+print("post total")
+t<-nrow(post)
+t
+
+print("Missing previous visit")
+nc<-subset(post, Patient_change == "Missing previous visit")
+nrow(nc)
+nrow(nc)/(t-nrow(nc))*100
+
+print("Increase")
+inc<-subset(post, Patient_change == "Increase")
+nrow(inc)
+nrow(inc)/(t-nrow(nc))*100
+
+summary(inc$change_amount)
+mean(inc$change_amount)
+sd(inc$change_amount)
+
+print("Decrease")
+dc<-subset(post, Patient_change == "Decrease")
+nrow(dc)
+nrow(dc)/(t-nrow(nc))*100
+
+summary(dc$change_amount)
+mean(dc$change_amount)
+sd(dc$change_amount)
+
+```
+
+
+#Merge figure 4 plots
+```{r}
+x <-"figure_4_merged"
+
+combined_relative_abundance_2 <- combined_relative_abundance
+staph_merged_dotplot_2 <- staph_merged_dotplot 
+
+
+figure_4<- (combined_relative_abundance_2 | staph_merged_dotplot_2)+  
+  plot_layout(widths = c(1,1.1))
+
+figure_4
+
+  
+#Save plot as pdf
+setwd(f)
+pdf(file = paste0(x,".pdf"), width = 31.333, height =  18) 
+figure_4
+dev.off()
+
+#Save as image
+png(filename = paste0(x,".png"), width =  9400 , height = 5400, res = 300)
+figure_4
+dev.off()
+```
+
