@@ -2,6 +2,7 @@
 title: "Maryland_Supplemental_Figures"
 output: html_document
 date: "2025-12-31"
+note: must run script "Maryland_Final_Figures.rmd" first.
 ---
 
 #Set working directory
