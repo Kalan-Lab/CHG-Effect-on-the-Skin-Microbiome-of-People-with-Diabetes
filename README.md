@@ -1,7 +1,7 @@
 # Read Me
 Accompanying files for the manuscript "Daily Chlorhexidine Foot Cleansing Reduces Staphylococcal Burden on the Feet of People with Prior Diabetic Foot Complications". Contains the scripts for all codes used for pre-processing and analysis. Also contains processed data used for analysis. 
 
-# Navigating the github page
+# Navigating the GitHub page
   1. Codes used for processing raw files on the terminal are in the directory "Codes_for_processing_raw_sequences". Raw sequences can be obtained from the SRA website using the information provided in the data availabilty section of the paper. 
      
   2. The metadata and data tables exported after processing of raw sequences (An OTU table, taxaonomy table, and representative sequence table) are found in the directory ".
