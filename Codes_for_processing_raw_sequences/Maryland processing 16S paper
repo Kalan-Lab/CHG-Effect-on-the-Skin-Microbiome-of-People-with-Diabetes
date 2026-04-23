@@ -1,0 +1,140 @@
+Maryland processing 16S paper
+
+#Create fastp for cleaning. NOTE: create output files first (ie. trimmed). Create loop for fastp analysis
+
+nano fastp
+
+
+#Write script
+
+cd /Users/michellebode/maryland/16S/FASTQ/raw_sequences
+
+fastqc *.fastq.gz -o fastQC
+
+cd fastQC
+
+multiqc .
+
+
+for i in `ls *R1.fastq.gz | sed 's/.fastq.gz//g'`;
+do
+ j=`echo ${i} | sed 's/R1/R2/g'`
+ fastp -q 25 --trim_poly_g --detect_adapter_for_pe -i ${i}.fastq.gz -I ${j}.fastq.gz -o /Users/michellebode/maryland/16S/processed_data/trimmed/${i}_t.fastq.gz -O /Users/michellebode/maryland/16S/processed_data/trimmed/${j}_t.fastq.gz
+done
+
+cd /Users/michellebode/maryland/ITS/processed_data/trimmed/
+
+fastqc *.fastq.gz -o fastQC
+
+cd fastQC
+
+multiqc .
+
+
+# Run fastp on samples
+
+bash fastp
+
+
+# Write script to create manifest file:
+
+nano manifest.py 
+
+
+#In script wrote:
+
+import os
+
+# Directory where your fastq.gz files are located
+directory = "/Users/michellebode/maryland/16S/processed_data/trimmed/"
+
+# Output file
+output_file = "manifest.txt"
+
+# Open output file for writing
+with open(output_file, 'w') as f:
+    # Write header
+    f.write("sample-id,absolute-filepath,direction\n")
+    
+    # Loop through files in directory
+    for filename in os.listdir(directory):
+        if filename.endswith("_R1_t.fastq.gz"):
+            # Extract sample-id (before _R) and create absolute path
+            sample_id = filename.split("_R")[0]
+            abs_path = os.path.join(directory, filename)
+            
+            # Write forward read
+            f.write(f"{sample_id},{abs_path},forward\n")
+            
+            # Create reverse filename
+            reverse_filename = filename.replace("_R1_t.fastq.gz", "_R2_t.fastq.gz")
+            reverse_abs_path = os.path.join(directory, reverse_filename)
+            
+            # Write reverse read
+            f.write(f"{sample_id},{reverse_abs_path},reverse\n")
+
+print(f"Formatted file saved as {output_file}")
+
+
+# Created manifest file by running script
+
+python3 manifest.py
+
+
+# Import manifest.txt into a qiime readable format 
+
+qiime tools import \
+  --type "SampleData[PairedEndSequencesWithQuality]" \
+  --input-format PairedEndFastqManifestPhred33\
+  --input-path manifest.txt \
+  --output-path sequences_q25.qza
+
+#Denoise and merge with DADA2
+
+ qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs sequences_q25.qza \
+  --p-trim-left-f 0 \
+  --p-trim-left-r 0 \
+  --p-trunc-len-f 280 \
+  --p-trunc-len-r 250 \
+  --output-dir dadaout \
+  --verbose
+
+#Check results
+qiime metadata tabulate \
+  --m-input-file dadaout/denoising_stats.qza  \
+  --o-visualization denoising_stats.qzv
+qiime tools view denoising_stats.qzv
+
+#Cluster into 99% OTUs
+
+qiime vsearch cluster-features-de-novo \
+  --i-sequences dadaout/representative_sequences.qza \
+  --i-table dadaout/table.qza \
+  --p-perc-identity 0.99 \
+  --o-clustered-table table-dada2-0_99_clust.qza \
+  --o-clustered-sequences rep-seqs-dada2-0_99_clust.qza
+
+#Silvia database 
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier /Users/michellebode/maryland/16S/processed_data/classifers/silva-138-99-nb-classifier.qza \
+  --i-reads rep-seqs-dada2-0_99_clust.qza \
+  --p-confidence 0.85 \
+  --o-classification TaxonomyFinal_Silva.qza
+
+#View Barplots for each database 
+
+qiime taxa barplot \
+  --i-table table-dada2-0_99_clust.qza \
+  --i-taxonomy TaxonomyFinal_Silva.qza \
+  --m-metadata-file /Users/michellebode/maryland/metadata.txt \
+  --o-visualization taxa-bar-plots_Silva.qzv
+qiime tools view taxa-bar-plots_Silva.qzv
+
+#Make phylogentic tree
+
+qiime phylogeny align-to-tree-mafft-fasttree \
+--i-sequences rep-seqs-dada2-0_99_clust.qza \
+--output-dir tree
+
