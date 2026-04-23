@@ -3,6 +3,7 @@ title: "Maryland_Final_Figures"
 author: "Michelle Bode"
 output: html_document
 date: "2025-12-15"
+note: Must run scripts "Maryland_ITS_Analysis_Prep_Final.rmd", "Maryland_16S_Analysis_Prep_Final.rmd" and "Maryland_dpcr_analysis_preperation.rmd" first. 
 ---
 
 #Set working directory
