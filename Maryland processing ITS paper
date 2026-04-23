@@ -1,0 +1,173 @@
+Maryland processing ITS paper
+Date:09/12/2025
+Owner:Michelle Bode
+
+
+#Create and move to working directory 
+mkdir [name of directory]
+cd [name of directory]
+
+#Move raw sequences to directory 
+mv [Insert pathway to directory with raw sequences] [Insert pathway to working directory]/raw_sequences
+
+
+#Create output file for cleaned sequences
+mkdir trimmed
+
+
+#Create fastp for cleaning sequenes. Create loop for fastp analysis:
+
+#Create script
+
+nano fastp
+
+#Write script
+  cd raw_sequences
+
+  fastqc *.fastq.gz -o fastQC
+
+  cd fastQC
+
+  multiqc .
+
+  for i in `ls *R1.fastq.gz | sed 's/.fastq.gz//g'`;
+  do
+  j=`echo ${i} | sed 's/R1/R2/g'`
+  fastp -q 25 --trim_poly_g --detect_adapter_for_pe -i ${i}.fastq.gz -I ${j}.fastq.gz -o [Insert pathway to working directory]/trimmed/${i}_t.fastq.gz -O [Insert pathway to working directory]/trimmed/${j}_t.fastq.gz
+  done
+
+  cd [Insert pathway to working directory]/trimmed/
+
+  fastqc *.fastq.gz -o fastQC
+
+  cd fastQC
+
+  multiqc .
+
+# Run fastp on samples
+bash fastp
+
+#Return to working directory
+[Insert pathway to working directory]
+
+
+#Create script to generate manifest file that is needed to convert sequences to Qiime redable format
+
+# Write script to create manifest file:
+nano manifest.py 
+
+#Write script
+
+  import os
+
+  # Directory where your fastq.gz files are located
+  directory = "[Insert pathway to working directory]/trimmed/"
+
+  # Output file
+  output_file = "manifest.txt"
+
+  # Open output file for writing
+  with open(output_file, 'w') as f:
+      # Write header
+      f.write("sample-id,absolute-filepath,direction\n")
+      
+      # Loop through files in directory
+      for filename in os.listdir(directory):
+          if filename.endswith("_R1_t.fastq.gz"):
+              # Extract sample-id (before _R) and create absolute path
+              sample_id = filename.split("_R")[0]
+              abs_path = os.path.join(directory, filename)
+              
+              # Write forward read
+              f.write(f"{sample_id},{abs_path},forward\n")
+              
+              # Create reverse filename
+              reverse_filename = filename.replace("_R1_t.fastq.gz", "_R2_t.fastq.gz")
+              reverse_abs_path = os.path.join(directory, reverse_filename)
+              
+              # Write reverse read
+              f.write(f"{sample_id},{reverse_abs_path},reverse\n")
+
+  print(f"Formatted file saved as {output_file}")
+
+
+# Created manifest file by running script
+python3 manifest.py
+
+# Import manifest.txt into a qiime readable format 
+
+qiime tools import \
+  --type "SampleData[PairedEndSequencesWithQuality]" \
+  --input-format PairedEndFastqManifestPhred33\
+  --input-path manifest.txt \
+  --output-path sequences.qza
+
+#Denoise and merge with DADA2
+
+ qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs sequences.qza \
+  --p-max-ee-f 8 \
+  --p-max-ee-r 8 \
+  --p-trunc-q 8 \
+  --p-trunc-len-r 0 \
+  --p-trunc-len-f 0 \
+  --output-dir dadaout
+  --verbose
+
+#Check results
+qiime metadata tabulate \
+  --m-input-file dadaout/denoising_stats.qza  \
+  --o-visualization denoising_stats.qzv
+qiime tools view denoising_stats.qzv
+
+
+#Remove short sequences
+qiime rescript filter-seqs-length \
+  --i-sequences dadaout/representative_sequences.qza \
+  --p-global-min 100 \
+  --o-filtered-seqs  rep-seqs-length-filtered.qza \
+  --o-discarded-seqs discard_filtered.qza
+
+qiime feature-table filter-features \
+  --i-table dadaout/table.qza \
+  --m-metadata-file rep-seqs-length-filtered.qza \
+  --o-filtered-table table-length-filtered.qza
+
+# Cluster the reads on 97%
+qiime vsearch cluster-features-de-novo \
+  --i-sequences rep-seqs-length-filtered.qza \
+  --i-table table-length-filtered.qza \
+  --p-perc-identity 0.97 \
+  --o-clustered-table table-dada2-0_97_clust.qza \
+  --o-clustered-sequences rep-seqs-dada2-0_97_clust.qza
+
+qiime feature-table summarize \
+  --i-table table-dada2-0_97_clust.qza \
+  --o-visualization table_summary.qzv
+  qiime tools view table_summary.qzv
+
+qiime feature-classifier classify-consensus-blast \
+  --p-evalue 0.000001 \
+  --p-min-consensus 0.8 \
+  --p-query-cov 0.97 \
+  --i-query rep-seqs-dada2-0_97_clust.qza \
+  --i-reference-reads [Insert pathway to classifier]/UNITE_public_19.02.2025.qza \
+  --i-reference-taxonomy [Insert pathway to classifier]/UNITE_public_taxonomy_modi2_19.02.2025.qza \
+  --p-perc-identity 0.97 \
+  --output-dir TaxonomyFinal97Blast_fitler.qza \
+  --verbose
+
+#view table
+qiime metadata tabulate \
+  --m-input-file TaxonomyFinal97Blast_filter.qza/classification.qza\
+  --o-visualization classification.qzv
+qiime tools view classification.qzv
+
+
+#Create barplot
+qiime taxa barplot \
+  --i-table table-dada2-0_97_clust.qza \
+  --i-taxonomy TaxonomyFinal97Blast_filter.qza/classification.qza \
+  --m-metadata-file [Insert pathway to data]/metadata.txt \
+  --o-visualization barplot_blast_final_filter.qzv
+  qiime tools view barplot_blast_final_filter.qzv
